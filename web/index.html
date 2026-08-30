@@ -1,0 +1,876 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>وكيل الأفكار الاستراتيجية</title>
+<style>
+  :root {
+    --bg: #faf9f7;
+    --surface: #ffffff;
+    --raised: #f5f3f0;
+    --border: #e6e2dc;
+    --border-strong: #d4cfc7;
+    --text: #1f1e1c;
+    --text-soft: #6b6862;
+    --text-faint: #9a958d;
+    --accent: #c65f3f;
+    --accent-soft: #f2e4de;
+    --ok: #2e7d63;
+    --warn: #b8860b;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --font: "Segoe UI", "Noto Sans Arabic", "Tahoma", system-ui, sans-serif;
+    --mono: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1b19;
+      --surface: #262523;
+      --raised: #2f2e2b;
+      --border: #3a3835;
+      --border-strong: #4a4744;
+      --text: #f0eeea;
+      --text-soft: #a8a49d;
+      --text-faint: #75716b;
+      --accent: #e08464;
+      --accent-soft: #3a2a24;
+    }
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.75;
+    font-size: 15px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---------- الترويسة ---------- */
+  header {
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky; top: 0; z-index: 20;
+  }
+  .head-inner {
+    max-width: 780px; margin: 0 auto;
+    padding: 14px 24px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .logo {
+    width: 26px; height: 26px; flex: none;
+    border-radius: 7px;
+    background: var(--accent);
+    display: grid; place-items: center;
+    color: #fff; font-size: 13px; font-weight: 700;
+  }
+  .brand { font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
+  /* المجموعة كلها تُدفع للطرف، لا .model وحدها: الدفع من داخلها كان
+     يقذف الأزرار التي بعدها خارج العرض تماماً فلا يمكن النقر عليها. */
+  .head-right {
+    margin-inline-start: auto;
+    display: flex; align-items: center; gap: 8px;
+    flex-wrap: wrap; justify-content: flex-end;
+  }
+  .model {
+    font-family: var(--mono); font-size: 11.5px;
+    color: var(--text-faint);
+    direction: ltr; unicode-bidi: embed;
+    background: var(--raised);
+    padding: 3px 9px; border-radius: 20px;
+    border: 1px solid var(--border);
+  }
+
+  /* ---------- الجسم ---------- */
+  main {
+    flex: 1; width: 100%;
+    max-width: 780px; margin: 0 auto;
+    padding: 0 24px 80px;
+  }
+
+  .hero { padding: 64px 0 32px; text-align: center; }
+  .hero h1 {
+    font-size: 30px; font-weight: 600;
+    letter-spacing: -0.02em; line-height: 1.35;
+    margin-bottom: 10px;
+  }
+  .hero p { color: var(--text-soft); font-size: 15px; }
+
+  /* ---------- صندوق الإدخال ---------- */
+  .composer {
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    padding: 6px;
+    display: flex; align-items: flex-end; gap: 6px;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .composer:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .composer textarea {
+    flex: 1; border: 0; outline: 0; resize: none;
+    background: transparent; color: var(--text);
+    font: inherit; line-height: 1.6;
+    padding: 10px 12px; max-height: 180px;
+  }
+  .composer textarea::placeholder { color: var(--text-faint); }
+
+  button.send {
+    flex: none; border: 0; cursor: pointer;
+    background: var(--accent); color: #fff;
+    width: 34px; height: 34px; border-radius: var(--radius-sm);
+    display: grid; place-items: center;
+    transition: opacity .15s;
+    margin-bottom: 3px;
+  }
+  button.send:hover:not(:disabled) { opacity: .88; }
+  button.send:disabled { opacity: .3; cursor: not-allowed; }
+  button.send svg { width: 15px; height: 15px; }
+
+  /* مبدّل النموذج */
+  .picker {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    justify-content: center; margin-bottom: 12px;
+  }
+  .mchip {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text-soft); font-size: 12.5px;
+    padding: 5px 12px; border-radius: 20px; cursor: pointer;
+    transition: all .15s;
+  }
+  .mchip:hover { border-color: var(--accent); }
+  .mchip.on {
+    border-color: var(--accent); color: var(--accent);
+    background: var(--accent-soft); font-weight: 600;
+  }
+  .mchip .tag {
+    font-size: 10.5px; padding: 1px 6px; border-radius: 10px;
+    background: var(--raised); color: var(--text-faint);
+    border: 1px solid var(--border);
+  }
+  .mchip.on .tag { background: var(--surface); }
+
+  .hint {
+    margin-top: 10px; font-size: 12.5px; color: var(--text-faint);
+    display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+  }
+  .chip {
+    background: var(--raised); border: 1px solid var(--border);
+    padding: 4px 11px; border-radius: 20px; cursor: pointer;
+    transition: border-color .15s, color .15s;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ---------- التقدّم ---------- */
+  .run { margin-top: 36px; display: none; }
+  .run.on { display: block; }
+
+  .run-head {
+    display: flex; align-items: baseline; gap: 10px;
+    padding-bottom: 14px; margin-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .run-topic { font-weight: 600; font-size: 16px; flex: 1; }
+  .run-time {
+    font-family: var(--mono); font-size: 12px; color: var(--text-faint);
+    direction: ltr; unicode-bidi: embed;
+  }
+
+  .track { height: 3px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .track > i {
+    display: block; height: 100%; width: 0;
+    background: var(--accent);
+    transition: width .5s ease;
+  }
+
+  ol.stages { list-style: none; margin-top: 20px; }
+  ol.stages li {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 9px 0;
+    color: var(--text-faint);
+    transition: color .2s;
+  }
+  ol.stages li .dot {
+    flex: none; width: 16px; height: 16px; margin-top: 5px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-strong);
+    display: grid; place-items: center;
+    transition: all .2s;
+  }
+  ol.stages li .body { flex: 1; min-width: 0; }
+  ol.stages li .label { font-size: 14.5px; }
+  ol.stages li .note {
+    font-size: 12.5px; color: var(--text-faint); margin-top: 1px;
+  }
+  ol.stages li .t {
+    font-family: var(--mono); font-size: 11.5px; color: var(--text-faint);
+    direction: ltr; unicode-bidi: embed; flex: none; margin-top: 4px;
+  }
+
+  li.active { color: var(--text); }
+  li.active .label { font-weight: 600; }
+  li.active .dot {
+    border-color: var(--accent);
+    border-top-color: transparent;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  li.done { color: var(--text-soft); }
+  li.done .dot { border-color: var(--ok); background: var(--ok); }
+  li.done .dot::after {
+    content: ""; width: 4px; height: 7px;
+    border: solid #fff; border-width: 0 0 1.5px 1.5px;
+    transform: rotate(-45deg) translate(1px, -1px);
+  }
+
+  /* ---------- النتيجة ---------- */
+  .result { margin-top: 30px; display: none; }
+  .result.on { display: block; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .card-head {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    background: var(--raised);
+  }
+  .card-head .tick {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--ok); flex: none;
+    display: grid; place-items: center;
+  }
+  .card-head .tick::after {
+    content: ""; width: 4px; height: 8px;
+    border: solid #fff; border-width: 0 0 1.5px 1.5px;
+    transform: rotate(-45deg) translate(1px, -1px);
+  }
+  .card-head b { font-size: 14.5px; font-weight: 600; }
+
+  dl.facts { padding: 6px 20px 16px; }
+  dl.facts div {
+    display: flex; gap: 16px; align-items: baseline;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  dl.facts div:last-child { border-bottom: 0; }
+  dl.facts dt { color: var(--text-soft); font-size: 13px; width: 120px; flex: none; }
+  dl.facts dd { font-weight: 600; font-size: 13.5px; min-width: 0; word-break: break-all; }
+
+  .actions { display: flex; gap: 8px; padding: 0 20px 18px; flex-wrap: wrap; }
+  .btn {
+    border: 1px solid var(--border-strong); background: var(--surface);
+    color: var(--text); font: inherit; font-size: 13.5px;
+    padding: 7px 16px; border-radius: var(--radius-sm);
+    cursor: pointer; text-decoration: none;
+    transition: border-color .15s, color .15s;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn.primary:hover { opacity: .88; color: #fff; }
+
+  .note-box {
+    margin-top: 14px; padding: 11px 16px;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--raised);
+    font-size: 13px; color: var(--text-soft);
+  }
+  .note-box code {
+    font-family: var(--mono); font-size: 12px;
+    direction: ltr; unicode-bidi: embed; display: inline-block;
+    background: var(--surface); padding: 1px 6px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  .alert {
+    margin-top: 14px; padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--warn); color: var(--warn);
+    background: transparent; font-size: 13.5px;
+  }
+  .alert.bad { border-color: #c0392b; color: #c0392b; }
+
+  /* ---------- لوحة المعلومات ---------- */
+  .navbtn {
+    /* .model يحمل margin-inline-start:auto فيدفع المجموعة يساراً */
+    border: 1px solid var(--border-strong); background: var(--surface);
+    color: var(--text-soft); font: inherit; font-size: 13px;
+    padding: 5px 13px; border-radius: var(--radius-sm); cursor: pointer;
+    transition: border-color .15s, color .15s;
+  }
+  .navbtn:hover, .navbtn.on { border-color: var(--accent); color: var(--accent); }
+
+  .dash { display: none; margin-top: 26px; }
+  .dash.on { display: block; }
+  .dash h2 {
+    font-size: 13px; font-weight: 600; color: var(--text-soft);
+    margin: 22px 0 9px; letter-spacing: .2px;
+  }
+  .dash h2:first-child { margin-top: 0; }
+  .dash .empty { color: var(--text-faint); font-size: 13px; padding: 4px 0; }
+
+  .grid2 { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } }
+
+  .tile {
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--surface); padding: 12px 15px;
+  }
+  .tile .big { font-size: 21px; font-weight: 600; }
+  .tile .cap { font-size: 12.5px; color: var(--text-soft); margin-top: 3px; }
+
+  ul.opps { list-style: none; display: grid; gap: 7px; }
+  ul.opps li {
+    display: flex; align-items: flex-start; gap: 11px;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--surface); padding: 10px 13px;
+  }
+  .score {
+    font-family: var(--mono); font-size: 12.5px; font-weight: 600;
+    flex: none; width: 30px; text-align: center; padding-top: 1px;
+    direction: ltr;
+  }
+  .band {
+    flex: none; font-size: 11px; padding: 2px 7px; border-radius: 20px;
+    border: 1px solid var(--border-strong); color: var(--text-soft);
+    direction: ltr;
+  }
+  .band.ACT { border-color: var(--ok); color: var(--ok); }
+  .band.WATCH { border-color: var(--accent); color: var(--accent); }
+  .opp-body { flex: 1; min-width: 0; }
+  .opp-body .t { font-size: 13.5px; }
+  .opp-body .m {
+    font-size: 12px; color: var(--text-faint); margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .srcs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .src {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; text-decoration: none;
+    color: var(--text-soft); background: var(--raised);
+    border: 1px solid var(--border); border-radius: 20px;
+    padding: 2px 9px; max-width: 100%;
+  }
+  .src:hover { border-color: var(--accent); color: var(--accent); }
+  .src .w {
+    font-family: var(--mono); font-size: 10px; direction: ltr;
+    color: var(--text-faint);
+  }
+  /* لون الوزن يقول جودة المصدر قبل قراءة الرقم */
+  .src.hi { border-color: var(--ok); }
+  .src.hi .w { color: var(--ok); }
+  .src.lo .w { color: var(--warn); }
+
+  /* ---------- الخدمات ---------- */
+  .svc-card {
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--surface); margin-bottom: 9px; overflow: hidden;
+  }
+  .svc-top {
+    display: flex; align-items: center; gap: 11px; padding: 11px 14px;
+  }
+  .svc-top .n { font-size: 14px; font-weight: 600; }
+  .svc-top .d { font-size: 12.5px; color: var(--text-faint); margin-top: 2px; }
+  .svc-top .body { flex: 1; min-width: 0; }
+  .kind {
+    flex: none; font-size: 10.5px; padding: 2px 7px; border-radius: 20px;
+    border: 1px solid var(--border-strong); color: var(--text-faint);
+  }
+  .kind.slow { border-color: var(--warn); color: var(--warn); }
+
+  .svc-in {
+    display: none; gap: 8px; padding: 0 14px 12px;
+  }
+  .svc-in.on { display: flex; }
+  .svc-in input {
+    flex: 1; min-width: 0; font: inherit; font-size: 13.5px;
+    background: var(--raised); color: var(--text);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 7px 11px;
+  }
+  .svc-in input:focus { outline: none; border-color: var(--accent); }
+
+  pre.out {
+    display: none; margin: 0; padding: 13px 15px;
+    border-top: 1px solid var(--border); background: var(--bg);
+    font-family: var(--mono); font-size: 12px; line-height: 1.65;
+    white-space: pre-wrap; word-break: break-word;
+    max-height: 460px; overflow: auto;
+    direction: rtl; text-align: start;
+  }
+  pre.out.on { display: block; }
+  pre.out.err { color: #c0392b; }
+
+  footer {
+    text-align: center; padding: 20px;
+    font-size: 12px; color: var(--text-faint);
+    border-top: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="head-inner">
+    <div class="logo">◆</div>
+    <div class="brand">وكيل الأفكار الاستراتيجية</div>
+    <div class="head-right">
+      <div class="model" id="model">—</div>
+      <button class="navbtn" id="dashBtn">لوحة المعلومات</button>
+      <button class="navbtn" id="svcBtn">الخدمات</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="hero" id="hero">
+    <h1>ما الموضوع الذي نشتغل عليه؟</h1>
+    <p>سبعة وكلاء يبحثون وينقدون ويستخرجون حلولاً تنفّذها بنفسك</p>
+  </section>
+
+  <div class="picker" id="picker"></div>
+
+  <div class="composer">
+    <textarea id="topic" rows="1" placeholder="اكتب موضوعاً أو فكرة…"></textarea>
+    <button class="send" id="go" title="ابدأ">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 12H5M12 5l-7 7 7 7"/>
+      </svg>
+    </button>
+  </div>
+  <div class="hint" id="chips"></div>
+
+  <div id="err"></div>
+
+  <section class="run" id="run">
+    <div class="run-head">
+      <div class="run-topic" id="runTopic"></div>
+      <div class="run-time" id="runTime">00:00</div>
+    </div>
+    <div class="track"><i id="bar"></i></div>
+    <ol class="stages" id="stages"></ol>
+  </section>
+
+  <section class="result" id="result">
+    <div class="card">
+      <div class="card-head"><span class="tick"></span><b>اكتمل التقرير</b></div>
+      <dl class="facts" id="facts"></dl>
+      <div class="actions" id="actions"></div>
+    </div>
+    <div class="note-box">
+      المصادر محذوفة من نص التقرير ومحفوظة في قاعدة المعرفة —
+      استرجعها بـ <code>python memory.py sources</code>
+    </div>
+  </section>
+
+  <section class="dash" id="dash"></section>
+  <section class="dash" id="svc"></section>
+</main>
+
+<footer>يعمل محلياً على جهازك · لا يُرفع شيء إلى أي خادم عدا مزوّد النموذج</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+const SUGGESTIONS = [
+  "تحلية المياه بالطاقة الشمسية",
+  "إزالة النترات من مياه الشرب",
+  "معالجة مياه الصرف وإعادة استخدامها",
+];
+
+let timer = null, t0 = 0, stages = [];
+
+function fmt(s) {
+  const m = Math.floor(s / 60), r = Math.floor(s % 60);
+  return String(m).padStart(2, "0") + ":" + String(r).padStart(2, "0");
+}
+
+function renderStages(activeIdx, notes) {
+  $("stages").innerHTML = stages.map((s, i) => {
+    const cls = i < activeIdx ? "done" : i === activeIdx ? "active" : "";
+    const note = notes[i] ? `<div class="note">${notes[i]}</div>` : "";
+    const t = s.seconds ? `<div class="t">${s.seconds}s</div>` : "";
+    return `<li class="${cls}">
+      <span class="dot"></span>
+      <span class="body"><div class="label">${s.label}</div>${note}</span>
+      ${t}
+    </li>`;
+  }).join("");
+  const pct = Math.round((activeIdx / stages.length) * 100);
+  $("bar").style.width = pct + "%";
+}
+
+let chosenModel = null;
+
+function renderPicker(info) {
+  // النموذج السحابي أولاً: على عتاد بلا تسريع رسومي، المحلي أبطأ 10-20×.
+  // نعرض التقدير على الشريحة نفسها بدل إخفائه في التوثيق.
+  const opts = [
+    { id: info.model, label: info.model.split("/").pop(), tag: info.is_local ? "محلي" : "سحابي" },
+    ...(info.local_models || [])
+      .filter(m => m.id !== info.model)
+      .map(m => ({ id: m.id, label: m.label, tag: `محلي · ${m.gb}GB` })),
+  ];
+  chosenModel = info.model;
+  $("picker").innerHTML = opts.map(o =>
+    `<span class="mchip${o.id === chosenModel ? " on" : ""}" data-id="${o.id}">
+       ${o.label}<span class="tag">${o.tag}</span></span>`).join("");
+  document.querySelectorAll(".mchip").forEach(c => {
+    c.onclick = () => {
+      chosenModel = c.dataset.id;
+      document.querySelectorAll(".mchip").forEach(x => x.classList.remove("on"));
+      c.classList.add("on");
+      $("model").textContent = chosenModel;
+      const local = chosenModel.startsWith("ollama/");
+      $("err").innerHTML = local
+        ? `<div class="alert">النموذج المحلي يعمل بلا إنترنت وبلا تكلفة،
+           لكنه على هذا العتاد أبطأ 10-20 ضعفاً — احسب ساعة لا أربع دقائق.</div>`
+        : "";
+    };
+  });
+}
+
+async function boot() {
+  if (FILE_MODE) {
+    $("err").innerHTML = FILE_MSG;
+    $("go").disabled = true;
+    return;
+  }
+  const r = await fetch("/api/info").then(x => x.json());
+  $("model").textContent = r.model;
+  renderPicker(r);
+  stages = r.stages.map(s => ({ label: s[0], hint: s[1], seconds: 0 }));
+  $("chips").innerHTML = SUGGESTIONS
+    .map(s => `<span class="chip">${s}</span>`).join("");
+  document.querySelectorAll(".chip").forEach(c =>
+    c.onclick = () => { $("topic").value = c.textContent; $("topic").focus(); });
+  if (r.key_error) {
+    $("err").innerHTML = `<div class="alert bad">${r.key_error}</div>`;
+    $("go").disabled = true;
+    return;
+  }
+  // تشغيلة جارية من تبويب آخر أو من جلسة هُجرت؟ نُظهرها بدل 409 صامت.
+  const st = await fetch("/api/status").then(x => x.json());
+  if (st.active) {
+    $("err").innerHTML =
+      `<div class="alert">تشغيلة جارية: <b>${st.topic}</b> — المرحلة ${st.stage}/8،
+       منذ ${fmt(st.elapsed)}.
+       <button class="btn" id="cancelRun" style="margin-inline-start:10px">إلغاؤها</button></div>`;
+    $("cancelRun").onclick = async () => {
+      await fetch("/api/cancel", { method: "POST" });
+      location.href = location.pathname;
+    };
+    $("go").disabled = true;
+    return;
+  }
+
+  // رابط مباشر: /?q=الموضوع يبدأ التشغيل فوراً (قابل للحفظ في المفضلة)
+  const q = new URLSearchParams(location.search).get("q");
+  if (q) { ta.value = q; start(); }
+}
+
+const ta = $("topic");
+ta.addEventListener("input", () => {
+  ta.style.height = "auto";
+  ta.style.height = Math.min(ta.scrollHeight, 180) + "px";
+});
+ta.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); start(); }
+});
+$("go").onclick = start;
+
+async function start() {
+  const topic = ta.value.trim();
+  if (!topic) return;
+
+  $("go").disabled = true;
+  ta.disabled = true;
+  $("hero").style.display = "none";
+  $("err").innerHTML = "";
+  $("result").classList.remove("on");
+  $("run").classList.add("on");
+  $("runTopic").textContent = topic;
+
+  const notes = {};
+  stages.forEach(s => s.seconds = 0);
+  renderStages(0, notes);
+
+  t0 = Date.now();
+  timer = setInterval(() => {
+    $("runTime").textContent = fmt((Date.now() - t0) / 1000);
+  }, 500);
+
+  // fetch لا EventSource عمداً: EventSource يعيد الاتصال تلقائياً عند
+  // انقطاع الخادم، فتبويب متروك يعيد تشغيل موضوع قديم بلا علم صاحبه
+  // ويحرق حصة النموذج. fetch يفشل مرة واحدة ويتوقف.
+  let last = 0, lastAt = Date.now();
+
+  const finish = () => {
+    clearInterval(timer);
+    $("go").disabled = false;
+    ta.disabled = false;
+  };
+
+  const onEvent = (kind, d) => {
+    if (kind === "stage") {
+      if (d.index > last) {
+        stages[last].seconds = Math.round((Date.now() - lastAt) / 1000);
+        lastAt = Date.now();
+        last = d.index;
+      }
+      if (d.note) notes[d.index] = d.note;
+      renderStages(d.index, notes);
+    } else if (kind === "done") {
+      finish();
+      renderStages(stages.length, notes);
+      showResult(d);
+    } else if (kind === "failed") {
+      finish();
+      $("err").innerHTML = `<div class="alert bad">${d.error}</div>`;
+    }
+  };
+
+  try {
+    const qs = "topic=" + encodeURIComponent(topic)
+      + (chosenModel ? "&model=" + encodeURIComponent(chosenModel) : "");
+    const res = await fetch("/api/run?" + qs);
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({ error: "HTTP " + res.status }));
+      finish();
+      $("err").innerHTML = `<div class="alert bad">${e.error}</div>`;
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "", kind = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trimEnd();
+        buf = buf.slice(nl + 1);
+        if (line.startsWith("event: ")) kind = line.slice(7);
+        else if (line.startsWith("data: ")) onEvent(kind, JSON.parse(line.slice(6)));
+      }
+    }
+  } catch (err) {
+    finish();
+    $("err").innerHTML =
+      `<div class="alert bad">انقطع الاتصال بالخادم: ${err.message}</div>`;
+  }
+}
+
+function showResult(d) {
+  const rows = [
+    ["الملف", d.filename],
+    ["الحجم", d.chars.toLocaleString("ar") + " حرف"],
+    ["الزمن", fmt(d.seconds)],
+  ];
+  if (d.stats && d.stats.facts) {
+    rows.push(["حقائق مخزّنة", String(d.stats.stored)]);
+    const p = Math.round(100 * d.stats.sourced_facts / d.stats.facts);
+    rows.push(["موثّقة بمصدر", `${d.stats.sourced_facts} من ${d.stats.facts} (${p}%)`]);
+    rows.push(["كيانات", String(d.stats.entities)]);
+    rows.push(["تعارضات", String(d.stats.conflicts)]);
+  }
+  $("facts").innerHTML = rows
+    .map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
+
+  $("actions").innerHTML =
+    `<a class="btn primary" href="/api/file?p=${encodeURIComponent(d.path)}" target="_blank">فتح التقرير</a>
+     <button class="btn" onclick="location.reload()">موضوع جديد</button>`;
+
+  if (d.warnings && d.warnings.length) {
+    $("err").innerHTML = d.warnings
+      .map(w => `<div class="alert">${w}</div>`).join("");
+  }
+  if (d.timed_out) {
+    $("err").innerHTML += `<div class="alert">انتهت المهلة — التقرير جزئي.</div>`;
+  }
+  $("result").classList.add("on");
+}
+
+/* ---------- الخدمات ----------
+   أربع عشرة وحدة كانت تعمل ولا تُستدعى إلا بأمر طرفية يُحفظ غيباً. */
+function renderServices(list) {
+  $("svc").innerHTML =
+    `<h2>الخدمات</h2>` +
+    `<div class="empty">السريعة تقرأ من قاعدة المعرفة وترجع فوراً ·
+      البطيئة تستدعي النموذج وتأخذ دقائق</div>` +
+    list.map(s => `
+      <div class="svc-card" data-id="${esc(s.id)}">
+        <div class="svc-top">
+          <span class="kind ${esc(s.kind)}">${s.kind === "slow" ? "بطيئة" : "سريعة"}</span>
+          <span class="body"><div class="n">${esc(s.label)}</div>
+            <div class="d">${esc(s.desc)}</div></span>
+          <button class="btn go">شغّل</button>
+        </div>
+        <div class="svc-in${s.placeholder ? " on" : ""}">
+          <input type="text" placeholder="${esc(s.placeholder)}">
+        </div>
+        <pre class="out"></pre>
+      </div>`).join("");
+
+  document.querySelectorAll(".svc-card").forEach(card => {
+    const btn = card.querySelector(".go");
+    const out = card.querySelector(".out");
+    const inp = card.querySelector(".svc-in input");
+    btn.onclick = async () => {
+      btn.disabled = true;
+      const label = btn.textContent;
+      btn.textContent = "…";
+      out.className = "out on";
+      out.textContent = "جارٍ التنفيذ…";
+      try {
+        const r = await fetch("/api/service", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: card.dataset.id, input: inp ? inp.value : "" }),
+        });
+        const d = await r.json();
+        if (d.error) { out.className = "out on err"; out.textContent = d.error; }
+        else { out.textContent = d.text || "(بلا مخرجات)"; }
+      } catch (e) {
+        out.className = "out on err";
+        out.textContent = "تعذّر الاتصال: " + e.message;
+      }
+      btn.disabled = false;
+      btn.textContent = label;
+    };
+    if (inp) inp.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); btn.click(); }
+    });
+  });
+}
+
+/* ---------- لوحة المعلومات ----------
+   كانت تُحسب في dashboard.py وتُقدَّم على /api/dashboard، لكن الواجهة لم
+   تستدعها قط: رادار فرص كامل لا يراه أحد. */
+const esc = s => String(s ?? "").replace(/[&<>"]/g,
+  c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function tile(big, cap) {
+  return `<div class="tile"><div class="big">${esc(big)}</div>
+          <div class="cap">${esc(cap)}</div></div>`;
+}
+
+function renderDash(d) {
+  const out = [];
+
+  const opps = d.opportunities || [];
+  out.push("<h2>رادار الفرص</h2>");
+  if (d.schedule && d.schedule.enabled) {
+    const s = d.schedule;
+    const line = s.last_run
+      ? (s.last_ok
+          ? `آخر تحديث قبل ${s.hours_since} ساعة · رصد ${s.last_found} فرصة ·
+             التالي بعد ${s.hours_until} ساعة`
+          : `آخر محاولة فشلت: ${s.last_error}`)
+      : `لم يعمل بعد · أول جولة خلال دقائق`;
+    out.push(`<div class="empty">تحديث تلقائي كل ${s.every_hours} ساعة —
+              ${esc(line)}</div>`);
+  }
+  out.push(opps.length ? `<ul class="opps">` + opps.slice(0, 10).map(o => {
+    const meta = [o.company, o.location, o.event_type].filter(Boolean).join(" · ");
+    const title = o.url
+      ? `<a class="t" href="${esc(o.url)}" target="_blank" rel="noopener">${esc(o.title)}</a>`
+      : `<div class="t">${esc(o.title)}</div>`;
+    // المصدر ظاهر لا مخبّأ خلف العنوان: فرصة بلا مصدر تُرى ادّعاءً
+    const srcs = (o.sources || []).map(s => {
+      const w = s.weight == null ? "" : `<span class="w">${s.weight.toFixed(2)}</span>`;
+      const cls = s.weight == null ? "" : s.weight >= 0.75 ? " hi" : s.weight <= 0.40 ? " lo" : "";
+      return `<a class="src${cls}" href="${esc(s.url)}" target="_blank" rel="noopener"
+                title="${esc(s.tier || "")}">${w}${esc(s.site || s.url)}</a>`;
+    }).join("");
+    return `<li><span class="score">${esc(o.score)}</span>
+      <span class="band ${esc(o.band)}">${esc(o.band)}</span>
+      <span class="opp-body">${title}<div class="m">${esc(meta || o.why || "")}</div>
+      ${srcs ? `<div class="srcs">${srcs}</div>`
+             : `<div class="srcs"><span class="src lo">بلا مصدر موثّق</span></div>`}
+      </span></li>`;
+  }).join("") + "</ul>"
+    : `<div class="empty">لا فرص مرصودة بعد — شغّل «كشف فرص جديدة» من الخدمات</div>`);
+
+  const comps = d.competitors || [];
+  out.push("<h2>رادار المنافسين</h2>");
+  out.push(comps.length ? `<ul class="opps">` + comps.map(c =>
+    `<li><span class="score">${esc(c.threat)}</span>
+      <span class="opp-body"><div class="t">${esc(c.name)}</div>
+      <div class="m">${esc(c.sector || "")} · ${esc(c.moves)} حركة · ${esc(c.changes)} تغيّر</div>
+      </span></li>`).join("") + "</ul>"
+    : `<div class="empty">لا منافسين مُتابَعون</div>`);
+
+  const a = d.accuracy || {}, k = d.knowledge || {};
+  out.push("<h2>الدقّة والمعرفة</h2><div class=\"grid2\">");
+  if (a.resolved) {
+    out.push(tile(a.hit_rate + "%", `${a.resolved} تنبؤ محسوم · ${a.calibration || ""}`));
+  }
+  if (k.facts) {
+    const p = Math.round(100 * (k.sourced || 0) / k.facts);
+    out.push(tile(k.facts.toLocaleString("ar"), `حقيقة · ${p}% موثّقة بمصدر`));
+    out.push(tile(k.entities, "كيان في قاعدة المعرفة"));
+  }
+  out.push(tile((d.conflicts || []).length, "تعارض مرصود يحتاج حسماً"));
+  out.push("</div>");
+
+  $("dash").innerHTML = out.join("");
+}
+
+/* الصفحة تعمل عبر الخادم وحده: فتحها كملف يجعل أصلها file:// فتفشل كل
+   نداءات /api/ برسالة «Failed to parse URL» لا تدلّ على السبب. */
+const FILE_MODE = location.protocol === "file:";
+const FILE_MSG = `<div class="alert">هذه الصفحة تعمل عبر خادم البرنامج لا كملف.
+  أغلق هذا التبويب وشغّل <code>python app.py</code> ثم افتح
+  <code>http://127.0.0.1:8730</code></div>`;
+
+/* لوحة واحدة مفتوحة في كل مرة: فتحهما معاً يدفع المؤلّف أسفل شاشتين. */
+function panel(btnId, elId, loader) {
+  let loaded = false;
+  $(btnId).onclick = async () => {
+    const el = $(elId), on = !el.classList.contains("on");
+    ["dash", "svc"].forEach(x => $(x).classList.remove("on"));
+    ["dashBtn", "svcBtn"].forEach(x => $(x).classList.remove("on"));
+    if (!on) return;
+    el.classList.add("on");
+    $(btnId).classList.add("on");
+    if (FILE_MODE) { el.innerHTML = FILE_MSG; return; }
+    if (!loaded) {
+      el.innerHTML = `<div class="empty">…جارٍ التحميل</div>`;
+      try { await loader(); loaded = true; }
+      catch (e) { el.innerHTML = `<div class="alert">تعذّر التحميل: ${esc(e.message)}</div>`; }
+    }
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+}
+
+panel("dashBtn", "dash", async () => {
+  const [d, s] = await Promise.all([
+    fetch("/api/dashboard").then(x => x.json()),
+    fetch("/api/schedule").then(x => x.json()).catch(() => null),
+  ]);
+  d.schedule = s;
+  renderDash(d);
+});
+panel("svcBtn", "svc", async () =>
+  renderServices((await fetch("/api/services").then(x => x.json())).services));
+
+boot();
+</script>
+</body>
+</html>

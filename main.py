@@ -1,0 +1,623 @@
+"""
+وكيل الأفكار الاستراتيجية - نواة التشغيل.
+
+سبعة وكلاء متسلسلين يحوّلون موضوعاً واحداً إلى تقرير موثّق ينتهي بحلول
+ينفّذها فرد واحد.
+
+ملاحظة معمارية: استيراد crewai مؤجَّل داخل الدوال لا في رأس الملف.
+استيراده يكلّف ~10 ثوانٍ (وأضعافها داخل EXE)، وتأجيله يجعل الواجهة
+تظهر فوراً بدل انتظار المستخدم أمام شاشة سوداء.
+"""
+from __future__ import annotations
+
+import os
+import re
+import sys
+import textwrap
+import threading
+from datetime import date
+
+# إيقاف إرسال بيانات التتبّع لخوادم crewai الخارجية (يجب أن يسبق أي استيراد لها)
+os.environ.setdefault("CREWAI_TELEMETRY_OPT_OUT", "true")
+os.environ.setdefault("OTEL_SDK_DISABLED", "true")
+
+# ويندوز يستخدم cp1252 افتراضياً ولا يطبع العربية - نجبره على utf-8.
+# stdin مشمول: بدونه يُقرأ الموضوع العربي مشوّهاً فيخرج اسم ملف مثل
+# "2026-08-27_Ø_Ø²Ø_Ù_..." بدل الاسم الصحيح.
+for _stream in (sys.stdin, sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+TODAY = date.today()
+MODEL = os.getenv("MODEL", "openrouter/minimax/minimax-m3:free")
+
+
+def _flag(name: str, default: str) -> bool:
+    return os.getenv(name, default).strip().lower() not in ("0", "false", "no")
+
+
+# سقف زمني صلب للتشغيلة كاملة. بلا هذا تعلّق التشغيلة أبداً عند تعثّر
+# مزوّد النموذج، لأن max_retries/timeout يغطّيان المكالمة الواحدة فقط.
+RUN_TIMEOUT = int(os.getenv("RUN_TIMEOUT", "1500"))
+
+# سقف رموز مخرَج الوكيل الواحد. المركّب يحتاج أكثر لأنه يكتب التقرير.
+AGENT_MAX_TOKENS = int(os.getenv("AGENT_MAX_TOKENS", "3500"))
+SYNTH_MAX_TOKENS = int(os.getenv("SYNTH_MAX_TOKENS", "9000"))
+
+MAKE_PDF = _flag("MAKE_PDF", "1")
+
+# إخفاء المصادر من نص التقرير. تبقى في knowledge.db وتُسترجع بـ:
+#   python memory.py sources
+HIDE_SOURCES = _flag("HIDE_SOURCES", "1")
+
+# خط الأنابيب:
+#
+#   SEARCH → ┌─A1─A2─A3─A4─┐ → ┌─A5─A6─A7─┐ → Evidence → Scoring
+#            └─ الموجة 1 ──┘   └─ الموجة 2┘        ↓
+#                                                RED TEAM → Synthesis
+#                                                    ↓
+#                                        Citation Guardrail → Final Report
+STAGES = [
+    ("البحث وترقيم المصادر", "S1..Sn بعنوان ورابط ومقتطف"),
+    ("تحميل المهارات", "خبرة المجال المطابقة"),
+    ("الموجة الأولى", "A1-A4 متوازية من المصادر"),
+    ("جمع الأدلة", "تحليل JSON وفرز الإسناد"),
+    ("الموجة الثانية", "A5-A7 متوازية"),
+    ("التسجيل", "مكافأة المُسنَد وعقاب الملفَّق"),
+    ("الفريق الأحمر", "لماذا قد يفشل هذا؟"),
+    ("إعادة التسجيل", "بعد نقاط الفشل"),
+    ("التركيب", "دمج المرتّب في تقرير"),
+    ("تحقّق الإسناد", "رفض المعرّفات المخترعة"),
+]
+
+# نوع المهمة لكل وكيل - يحدّد المزوّد المفضّل (انظر providers.ROUTES).
+# A1 استخراج قصير فيذهب للأسرع؛ الباقي تحليل؛ التركيب طويل السياق.
+KIND_OF = {"A1": "fast", "A2": "analytic", "A3": "analytic", "A4": "analytic",
+           "A5": "analytic", "A6": "analytic", "A7": "analytic",
+           "RED": "analytic", "SYN": "broad"}
+
+_KEY_ENV = {"openrouter/": "OPENROUTER_API_KEY", "gpt-": "OPENAI_API_KEY",
+            "openai/": "OPENAI_API_KEY", "anthropic/": "ANTHROPIC_API_KEY"}
+
+
+class RunTimeout(Exception):
+    """تجاوزت التشغيلة سقفها الزمني - ما أُنجز يُحفظ كتقرير جزئي."""
+
+
+def required_key() -> str:
+    """اسم متغيّر البيئة الذي يحتاجه النموذج المختار."""
+    return next((v for k, v in _KEY_ENV.items() if MODEL.startswith(k)), "OPENAI_API_KEY")
+
+
+def is_local() -> bool:
+    """هل النموذج يعمل محلياً عبر Ollama؟"""
+    return MODEL.startswith(("ollama/", "ollama_chat/"))
+
+
+def check_key() -> str | None:
+    """يعيد رسالة خطأ إن كان المفتاح ناقصاً، أو None إن كان سليماً."""
+    if is_local():
+        # النماذج المحلية لا تحتاج مفتاحاً، لكنها تحتاج خادم Ollama حيّاً
+        import urllib.error
+        import urllib.request
+        try:
+            urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=3)
+        except (urllib.error.URLError, OSError):
+            return ("خادم Ollama لا يستجيب على 11434. شغّله بـ: ollama serve  "
+                    f"(النموذج المختار: {MODEL})")
+        return None
+
+    need = required_key()
+    if not os.getenv(need):
+        return f"{need} غير موجود في ملف .env (النموذج المختار: {MODEL})"
+    return None
+
+
+# ======================
+# البحث الحقيقي (يُنفَّذ في الكود، لا يُترك لمزاج النموذج)
+# ======================
+def _search_tool():
+    if not os.getenv("SERPER_API_KEY"):
+        return None
+    from crewai_tools import SerperDevTool
+    return SerperDevTool()
+
+
+def _browser_tool():
+    """
+    أداة تصفح حقيقي - معطّلة افتراضياً.
+
+    زيارة صفحة تكلّف 20-60 ثانية مقابل ثانية لبحث Serper، فتشغيلها في كل
+    تشغيلة ينسف مكسب السرعة. تُفعَّل بـ BROWSER_AGENT=1 حين تحتاج رقماً
+    داخل جدول أو تقرير لا يظهر في مقتطف البحث.
+    """
+    try:
+        import browser_agent
+        return browser_agent.tool()
+    except Exception:
+        return None
+
+
+def prefetch_research(topic: str, max_queries: int = 4):
+    """
+    ينفّذ بحثاً فعلياً ويعيد سجل مصادر مرقّمة (S1, S2, …).
+
+    الترقيم يجعل الإسناد قابلاً للتحقق آلياً: نتأكد أن كل معرّف يذكره وكيل
+    موجود فعلاً في السجل. عدّ الروابط الخام لا يكشف رابطاً مخترعاً.
+    """
+    import sources
+
+    reg = sources.Registry()
+    tool = _search_tool()
+    if tool is None:
+        return reg
+
+    # استعلامات موجَّهة نحو المصادر القوية.
+    #
+    # السبب: البحث العام يعيد ما يتصدّر جوجل - مواقع مورّدين ومنصات تواصل.
+    # قياس فعلي على تشغيلة كاملة أعطى متوسط وزن 0.34 وصفر مصدر قوي من 15.
+    # حصر النطاق يجلب الدوريات والجهات الحكومية التي لا تتصدّر البحث العام.
+    scholarly = [
+        f"{topic} site:sciencedirect.com OR site:mdpi.com OR site:springer.com",
+        f"{topic} filetype:pdf research study",
+        f"{topic} site:.gov OR site:.edu OR site:iso.org",
+    ]
+    general = [topic, f"{topic} تحديات", f"{topic} {TODAY.year}",
+               f"{topic} latest developments"]
+
+    # نبدأ بالقوي: لو نفدت الحصة أو تعثّر البحث، يبقى ما جُمع أعلى جودة
+    queries = (scholarly + general)[:max(3, max_queries + 2)]
+
+    import cache
+
+    # ── القواعد العلمية أولاً ──
+    # الترتيب مقصود: الوكلاء يستشهدون بأوائل السجل أكثر، وحصر النطاق بـ
+    # site: لم يكفِ لأن الدوريات لا تتصدّر البحث العام أصلاً. نسألها
+    # مباشرةً بدل أن نرجو محرّكاً تجارياً أن يعيدها.
+    try:
+        import scholar
+        for it in scholar.search(topic, k=8):
+            reg.add(it["title"], it["url"], it["snippet"], "قاعدة علمية")
+    except Exception:
+        pass                       # المصدر العلمي إضافة لا شرط
+
+    # ── البحث العام ──
+    # سقف نطاقين لكل موقع: تسع صفحات من مورّد واحد كانت تُغرق السجل وتُوهم
+    # «تعدّد الأدلة» في الترجيح، وهي في الحقيقة مصدر واحد يكرّر نفسه.
+    from urllib.parse import urlparse
+
+    per_host: dict[str, int] = {}
+    for q in queries:
+        raw = cache.cached_search(tool, q)
+        if raw is None:
+            continue
+        organic = (raw or {}).get("organic", []) if isinstance(raw, dict) else []
+        for it in organic[:6]:
+            link = it.get("link")
+            if not link:
+                continue
+            try:
+                host = (urlparse(link).netloc or "").lower().removeprefix("www.")
+            except ValueError:
+                host = ""
+            if per_host.get(host, 0) >= 2:
+                continue
+            per_host[host] = per_host.get(host, 0) + 1
+            reg.add(it.get("title", ""), link, it.get("snippet", ""), q)
+
+    return _prune_weak(reg)
+
+
+def _prune_weak(reg, floor: int = 12):
+    """
+    يسقط أضعف المصادر متى بقي عدد كافٍ.
+
+    منصات التواصل والمنتديات كانت تدخل السجل بوزن 0.20 وتُستشهد بها كأي
+    مصدر آخر. حذفها حين يتوفّر البديل يرفع متوسط الوزن بلا أن يترك وكيلاً
+    بلا سند - ولذلك نُبقيها إن قلّ السجل عن `floor`.
+    """
+    try:
+        import trust
+    except ImportError:
+        return reg
+
+    keep = [s for s in reg.items if trust.weight(s.url) > 0.25]
+    if len(keep) < floor or len(keep) == len(reg.items):
+        return reg
+
+    import sources
+
+    out = sources.Registry()
+    for s in keep:
+        out.add(s.title, s.url, s.snippet, s.query)
+    return out
+
+
+# ======================
+# بناء الوكلاء
+# ======================
+def build_agents() -> dict:
+    """
+    ينشئ الوكلاء السبعة + المركّب من ROSTER - نسخة جديدة لكل تشغيلة.
+
+    نموذج مستقل لكل وكيل: الموجات متوازية، ومشاركة كائن LLM بين خيوط
+    متزامنة هي بالضبط صنف العطل الذي كلّفنا سابقاً
+    (RuntimeError: Executor is already running).
+    """
+    from crewai import Agent, LLM
+
+    import pipeline
+
+    # النموذج المحلي يولّد 2-6 رموز/ثانية على معالج بلا تسريع رسومي،
+    # فمهلة 180 ثانية تقطعه في منتصف كل مهمة.
+    opts = dict(max_retries=2, timeout=1200) if is_local() \
+        else dict(max_retries=6, timeout=180)
+
+    # سقف المخرَج. بدونه ينفلت وكيل ويولّد عشرات آلاف الرموز حتى ينقطع،
+    # فيخرج JSON مبتوراً ويضيع عمله كاملاً - رُصد فعلياً حين أنتج A7
+    # 132 ألف حرف لم يُحلَّل منها شيء. العناصر المطلوبة قصيرة ومنظّمة،
+    # فسقف 3500 رمز سخيّ عليها ويقطع الانفلات.
+    opts["max_tokens"] = AGENT_MAX_TOKENS
+
+    import providers
+
+    tools = [t for t in (_search_tool(), _browser_tool()) if t]
+
+    # MODEL المضبوط يدوياً يعلو على التوجيه التلقائي
+    forced = MODEL if os.getenv("MODEL") else None
+
+    def make(role, goal, backstory, temp, kind, with_tools=False, attempt=0):
+        try:
+            llm, _p = providers.make_llm(kind, attempt, temperature=temp,
+                                         forced=forced, **opts)
+        except IndexError:
+            raise
+        except Exception:
+            llm = LLM(model=MODEL, temperature=temp, **opts)
+        return Agent(role=role, goal=goal, backstory=backstory, llm=llm,
+                     tools=list(tools) if with_tools else [],
+                     verbose=False, allow_delegation=False, inject_date=True)
+
+    agents = {code: make(role, goal, back, temp, KIND_OF[code],
+                         with_tools=(code == "A1"))
+              for code, role, goal, back, temp, _ in pipeline.ROSTER}
+
+    agents["RED"] = make(
+        "الفريق الأحمر",
+        "تدمير أقوى الأفكار قبل أن يدمّرها السوق",
+        "مهاجم محترف. لا يقترح تحسينات ولا يجامل - يبحث عن الافتراض "
+        "الضمني الذي ينهار، والرقم الذي لا يصمد أمام الحساب، والسبب الذي "
+        "أفشل مشاريع مشابهة. يعرف أن الفكرة التي تنجو منه تستحق التنفيذ.",
+        0.35, providers.ANALYTIC)
+
+    agents["SYN"] = make(
+        "المركّب النهائي",
+        "دمج مخرجات الوكلاء السبعة في تقرير واحد مرتّب بالأولوية",
+        "قائد استراتيجي يجمع الإبداع بالواقعية. لا ينقل رقماً بلا معرّف "
+        "مصدره، ويكتب (تقدير) صراحة بجانب ما لا سند له.", 0.45, providers.BROAD)
+    agents["SYN"].llm.max_tokens = SYNTH_MAX_TOKENS
+
+    # مصنع لإعادة البناء بمزوّد بديل عند فشل الأول
+    def rebuild(code: str):
+        spec = next((r for r in pipeline.ROSTER if r[0] == code), None)
+        if code in ("SYN", "RED"):
+            kind = providers.BROAD if code == "SYN" else providers.ANALYTIC
+            return lambda n: make(agents[code].role, agents[code].goal,
+                                  agents[code].backstory,
+                                  0.45 if code == "SYN" else 0.35, kind, attempt=n)
+        if not spec:
+            return None
+        _, role, goal, back, temp, _ = spec
+        return lambda n: make(role, goal, back, temp, KIND_OF[code],
+                              with_tools=(code == "A1"), attempt=n)
+
+    agents["_rebuild"] = rebuild
+    return agents
+
+
+# ======================
+# التشغيل
+# ======================
+def _patch_guardrail_source() -> None:
+    """
+    يمنع انهيار الـEXE عند أول guardrail.
+
+    crewai يستدعي inspect.getsource() على أي guardrail قابل للاستدعاء ليسجّل
+    نصّه في حدث - بلا try/except. داخل EXE مبني بـPyInstaller لا توجد ملفات
+    .py على القرص، فيرمي OSError وتسقط التشغيلة كاملة.
+
+    نلفّ getsource داخل تلك الوحدة وحدها. (جُرّب أولاً تسجيل مصدر بديل في
+    linecache فلم ينجح.) يُطبَّق دائماً - بلا أثر حين يعمل getsource طبيعياً.
+    """
+    try:
+        from crewai.events.types import llm_guardrail_events as ev
+    except ImportError:
+        return
+    if getattr(ev.getsource, "__name__", "") == "safe_getsource":
+        return
+
+    original = ev.getsource
+
+    def safe_getsource(obj):
+        try:
+            return original(obj)
+        except (OSError, TypeError):
+            return f"<{getattr(obj, '__name__', 'guardrail')}: المصدر غير متاح>"
+
+    ev.getsource = safe_getsource
+
+
+def _silence_crewai() -> None:
+    """
+    يُسكِت إخراج crewai المتدفق.
+
+    ضروري لأن ConsoleFormatter يُنشأ بـ verbose=True مثبّتاً في المصدر
+    (crewai/events/event_listener.py) ولا يحترم Crew(verbose=False).
+    """
+    import logging
+
+    try:
+        from crewai.events.event_listener import event_listener
+        event_listener.formatter.verbose = False
+        event_listener.logger.verbose = False
+    except Exception:
+        pass                      # نسخة crewai مختلفة
+
+    for name in ("crewai", "LiteLLM", "httpx", "opentelemetry", "chromadb"):
+        logging.getLogger(name).setLevel(logging.ERROR)
+
+
+def run_creative_agent(topic: str, on_stage=None):
+    """
+    ينفّذ خط الأنابيب: بحث ← موجتان ← أدلة ← تسجيل ← تركيب ← تحقق إسناد.
+
+    يعيد (تقرير، نتيجة، توقّف؟). عند انتهاء المهلة أو فشل مرحلة نعيد ما
+    أُنجز مع سببه بدل محو العمل.
+    """
+    import pipeline
+
+    def stage(i, note=""):
+        if on_stage:
+            on_stage(i, note)
+
+    _patch_guardrail_source()
+    _silence_crewai()
+
+    stage(0)
+    reg = prefetch_research(topic)
+    stage(1, f"{len(reg.items)} مصدر مرقّم" if reg.items
+             else "بلا مفتاح SERPER - لا مصادر")
+
+    # مهارات المجال المطابقة للموضوع (Agent Skills)
+    skill_ctx = ""
+    try:
+        import skills
+        if picked := skills.select(topic):
+            skill_ctx = skills.as_context(picked)
+            stage(1, f"{len(reg.items)} مصدر · {len(picked)} مهارة مُحمَّلة")
+    except Exception:
+        pass                        # غياب المهارات لا يوقف التشغيل
+
+    agents = build_agents()
+    box: dict = {}
+
+    def work():
+        try:
+            box["res"] = pipeline.run(topic, reg, agents, skills=skill_ctx,
+                                      on_stage=stage, today=TODAY.isoformat(),
+                                      year=TODAY.year, model=MODEL)
+        except Exception as e:
+            box["err"] = f"{type(e).__name__}: {e}"
+
+    t = threading.Thread(target=work, daemon=True, name="pipeline")
+    t.start()
+    t.join(RUN_TIMEOUT)
+
+    if t.is_alive():
+        _silence_crewai()
+        head = f"> ⚠ **انتهت المهلة** ({RUN_TIMEOUT // 60} دقيقة).\n\n"
+        return head + reg.as_markdown(), None, True
+
+    if err := box.get("err"):
+        head = (f"> ⛔ **توقفت التشغيلة:** {err}\n>\n"
+                "> إن كنت على نموذج محلي صغير، فالأرجح أنه عجز عن إنتاج JSON "
+                "صالح أو الالتزام بمعرّفات المصادر.\n\n")
+        return head + reg.as_markdown(), None, True
+
+    res = box["res"]
+    res["registry"] = reg
+    return res["report"], res, False
+
+
+# ======================
+# المخرجات
+# ======================
+def strip_sources(md: str) -> str:
+    """
+    يزيل الروابط من نص التقرير ويحذف قسم المصادر.
+
+    الوكلاء يواصلون إنتاج المصادر - الـguardrail يفرضها - لأنها هي التي
+    تمنع اختراع الأرقام. نحذفها من العرض فقط بعد تخزينها في knowledge.db.
+
+    الرسومات محميّة: تُستبدل بعلامات قبل الحذف وتُعاد بعده. بدون هذا كان
+    `xmlns="http://www.w3.org/2000/svg"` يُعدّ رابطاً فيُحذف، فتنكسر كل
+    مخططات التقرير صامتةً.
+    """
+    keep: list[str] = []
+
+    def _shield(m):
+        keep.append(m.group(0))
+        return f"\x00SVG{len(keep) - 1}\x00"
+
+    md = re.sub(r"<svg\b.*?</svg>", _shield, md, flags=re.S | re.I)
+
+    # [#\s]* لأن النموذج يكتب أحياناً "## ## المصادر" بعلامات مكرّرة
+    md = re.sub(r"\n#{1,4}[#\s]*(?:[📚🔗]\s*)?(?:المصادر|المراجع|قائمة المصادر)\b"
+                r".*?(?=\n#{1,4}[ #]|\Z)", "\n", md, flags=re.S)
+
+    # رموز الإسناد. النموذج يكتبها مفردة [S1] ومجمّعة [S3, S11, S12]
+    # وبفاصلة عربية - والنمط القديم كان يلتقط المفردة وحدها فبقي 47 رمزاً
+    # في آخر تقرير. تبقى محفوظة في knowledge.db: python memory.py sources
+    sep = r"(?:\s*(?:[-–—/]|إلى|[,،]|و|vs\.?|مقابل)\s*)"
+    grp = rf"S\d+(?:{sep}S\d+)*"
+    md = re.sub(rf"\s*(?:\[\s*{grp}\s*\]\s*)+", " ", md)
+    md = re.sub(rf"\(\s*{grp}\s*\)", "", md)
+
+    # الوكيل يتحدّث أحياناً *عن* المصادر داخل الجملة: «المصادر S1, S2 تركز
+    # على التصميم، بينما S11-S14 تتناول ما بعد التشغيل». حذف الرمز وحده
+    # يترك «المصادر تركز» مبتورة، فنستبدل المدى بعبارة تحمل نفس المعنى.
+    def _prose(m):
+        n = len(re.findall(r"S\d+", m.group("ids")))
+        if m.group("lead"):
+            return m.group("lead")            # «المصادر S1, S2» ← «المصادر»
+        return "أحد المصادر" if n == 1 else "بعض المصادر"
+
+    md = re.sub(rf"(?P<lead>(?:ال)?(?:مصادر|مراجع)\s+)?"
+                rf"(?P<ids>(?<![A-Za-z0-9]){grp})", _prose, md)
+
+    # «[تقدير بناءً على الفجوة بين S11 وS12]» - رمز داخل قوس نصّي لا يطابق
+    # ما سبق، فكان يبقى وحيداً بلا قائمة مصادر تفسّره. ننظّف داخل القوس
+    # ونحذفه كلّه إن لم يبقَ فيه إلا الرموز.
+    def _debracket(m):
+        # بلا \b: الواو العربية حرف كلمة، فلا حدّ بينها وبين S في «وS12»
+        inner = re.sub(r"\s*و?(?<![A-Za-z0-9])S\d+", "", m.group(1))
+        inner = re.sub(r"\s*(?:بين|من|في|على|حسب|وفق|وفقاً|بناءً على|و)\s*$",
+                       "", inner.strip())
+        inner = inner.strip(" \u060c,-\u2013\u2014")
+        return f"[{inner}]" if inner else ""
+
+    md = re.sub(r"\[([^\[\]]*S\d+[^\[\]]*)\]", _debracket, md)
+
+    md = re.sub(r"\[([^\]]+)\]\(\s*https?://[^)]+\)", r"\1", md)   # [نص](رابط) ← نص
+    md = re.sub(r"\s*\((?:[^()]*?:\s*)?https?://[^)]*\)", "", md)  # (رابط) ← يُحذف
+    md = re.sub(r"https?://\S+", "", md)                           # رابط عارٍ
+    md = re.sub(r"^\s*[-*]?\s*(?:المصدر|المرجع|Source)\s*:?\s*$", "", md, flags=re.M)
+
+    # ([مصدر](رابط)) يخلّف "(مصدر)" فارغة بعد استخراج نص الرابط
+    md = re.sub(r"\s*[\(\[]\s*(?:مصدر|المصدر|مرجع|المرجع|[Ss]ource|[Rr]ef)\s*[\)\]]", "", md)
+    md = re.sub(r"\(\s*[،,؛;\-–—]*\s*\)", "", md)
+
+    # حذف الرمز يخلّف فراغاً قبل الفاصلة أو النقطة: «ضخمة" ، بينما»
+    md = re.sub(r"[ \t]+([،,؛;.!؟])", r"\1", md)
+    md = re.sub(r"[ \t]{2,}", " ", md)
+    md = re.sub(r"[ \t]+\n", "\n", md)
+    md = re.sub(r"\n{3,}", "\n\n", md).strip() + "\n"
+
+    return re.sub(r"\x00SVG(\d+)\x00", lambda m: keep[int(m.group(1))], md)
+
+
+def save_report(report: str, topic: str, out_dir: str = "output") -> str:
+    os.makedirs(out_dir, exist_ok=True)
+    slug = re.sub(r"[^\w؀-ۿ]+", "_", topic)[:40].strip("_")
+    path = os.path.join(out_dir, f"{TODAY.isoformat()}_{slug}.md")
+    header = f"# {topic}\n\n*أُنشئ في {TODAY.isoformat()} · النموذج: {MODEL}*\n\n---\n\n"
+    for p in (path, os.path.join(out_dir, "final_report.md")):
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(header + report)
+    return path
+
+
+def finish_run(report: str, topic: str) -> tuple[str, dict, list[str]]:
+    """
+    يخزّن الحقائق ثم يحفظ التقرير (نظيفاً) ويولّد PDF.
+
+    الترتيب مقصود: نبتلع النسخة الموثّقة أولاً لتُحفظ المصادر في
+    knowledge.db، ثم نحفظ النسخة النظيفة للعرض.
+    """
+    warnings: list[str] = []
+
+    stats: dict = {}
+    try:
+        import memory
+        stats = memory.ingest_report(report, topic)
+    except Exception as e:
+        warnings.append(f"تعذّر تخزين الحقائق: {type(e).__name__}: {e}")
+
+    body = strip_sources(report) if HIDE_SOURCES else report
+
+    # تقييم مستقل عبر Mastra (معطّل افتراضياً). يُحكَّم على النسخة الموثّقة
+    # لا المجرّدة - وإلا عاقبنا التقرير على مصادر نحن حذفناها.
+    try:
+        import judge
+        if verdict := judge.evaluate(report, topic):
+            body += judge.as_markdown(verdict)
+            stats["judge_total"] = verdict.get("total")
+    except Exception as e:
+        warnings.append(f"تعذّر التقييم المستقل: {type(e).__name__}: {e}")
+
+    path = save_report(body, topic)
+
+    if MAKE_PDF:
+        try:
+            import pdf
+            path = str(pdf.markdown_to_pdf(path))
+        except Exception as e:
+            warnings.append(f"تعذّر توليد PDF: {e}")
+
+    return path, stats, warnings
+
+
+# ======================
+# واجهة الطرفية (احتياطية - الافتراضي هو واجهة الويب في app.py)
+# ======================
+def main() -> int:
+    import time
+
+    import ui
+
+    if err := check_key():
+        ui.show_error(RuntimeError(err))
+        return 1
+
+    topic = ui.ask_topic()
+    if not topic:
+        ui.warn("لازم تدخل موضوع.")
+        return 1
+
+    started = time.perf_counter()
+    stages = [ui.Stage(label=a, hint=b) for a, b in STAGES]
+
+    with ui.Dashboard(model=MODEL, topic=topic, stages=stages) as dash:
+        report, _tasks, timed_out = run_creative_agent(
+            topic, on_stage=lambda i, note="": dash.start(i, note))
+
+    if timed_out:
+        ui.warn(f"انتهت المهلة ({RUN_TIMEOUT // 60} دقيقة) — حُفظ ما أُنجز كتقرير جزئي.")
+
+    path, stats, warns = finish_run(report, topic)
+    for w in warns:
+        ui.warn(w)
+
+    ui.show_result(path, report, stats, time.perf_counter() - started)
+
+    if timed_out:
+        # الخيط المهجور لا يزال حيّاً على مقبس شبكة. الخروج الطبيعي يوقظ
+        # آلية إغلاق crewai فتطبع أخطاءً مقلقة فوق نتيجة المستخدم.
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(0)
+
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        print("\nتم الإيقاف.")
+        sys.exit(130)
+    except Exception as e:
+        try:
+            import ui
+            ui.show_error(e)
+        except Exception:
+            print(f"\nفشل التشغيل: {type(e).__name__}: {e}")
+        input("\nاضغط Enter للإغلاق...")   # يمنع اختفاء نافذة الـEXE فوراً
+        sys.exit(1)

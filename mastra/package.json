@@ -1,0 +1,16 @@
+{
+  "name": "mastra",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "type": "module",
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "^3.0.40",
+    "@mastra/core": "^1.63.2",
+    "zod": "^4.5.4"
+  }
+}

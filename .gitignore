@@ -1,0 +1,47 @@
+# ── أسرار ──
+# .env يحمل مفاتيح API. لا يدخل المستودع أبداً - النموذج المرجعي
+# في .env.example يكفي لمن يستنسخ المشروع.
+.env
+.env.*
+!.env.example
+
+# ── بيئة بايثون ──
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# ── مخرجات البناء ──
+# dist 517 ميجابايت وbuild 112 - يُعاد توليدهما بأمر واحد:
+#   python build_exe.py
+build/
+dist/
+
+# ── حالة التشغيل ──
+# قاعدة المعرفة تتضخّم مع كل تشغيلة وتحمل بيانات عملك، وschedule.json
+# حالة لحظية. كلاهما يُبنى محلياً ولا معنى لمشاركته.
+knowledge.db
+knowledge.db-*
+*.sqlite
+*.sqlite3
+schedule.json
+.checkpoints/
+
+# ── التقارير المولّدة ──
+output/
+
+# ── Node (محكّم Mastra) ──
+node_modules/
+mastra/node_modules/
+package-lock.json
+npm-debug.log*
+
+# ── نظام التشغيل والمحرّرات ──
+Thumbs.db
+desktop.ini
+.DS_Store
+.idea/
+.vscode/
+*.swp
