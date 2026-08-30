@@ -63,6 +63,28 @@ def _local_models() -> list[dict]:
     return sorted(out, key=lambda x: x["gb"])
 
 
+def _routing() -> dict:
+    """
+    المزوّدون الجاهزون ومَن يتصدّر كل مسار.
+
+    الواجهة كانت تعرض معرّفات النماذج الخام (minimax-m3:free، qwen2.5:3b)
+    كشرائح للاختيار. صارت بلا معنى بعد أن أصبح التوجيه تلقائياً حسب نوع
+    المهمة: المستخدم لا يختار نموذجاً واحداً، والنظام يستعمل ثلاثة في
+    التشغيلة الواحدة ويتجاوز الفاشل. اسم المزوّد يقول الحقيقة، والمعرّف
+    الخام يقول نصفها.
+    """
+    try:
+        import providers
+        ready = [p.name for p in providers.available()]
+        first = {}
+        for kind in (providers.FAST, providers.ANALYTIC, providers.BROAD):
+            chain = providers.chain(kind)
+            first[kind] = chain[0][0].name if chain else None
+        return {"ready": ready, "routes": first}
+    except Exception:
+        return {"ready": [], "routes": {}}
+
+
 async def info(_request):
     _touch()          # فتح الصفحة = المستخدم حاضر
     return JSONResponse({
@@ -71,7 +93,7 @@ async def info(_request):
         "stages": core.STAGES,
         "key_error": core.check_key(),
         "timeout_min": core.RUN_TIMEOUT // 60,
-        "local_models": _local_models(),
+        "routing": _routing(),
     })
 
 

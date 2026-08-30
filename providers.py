@@ -74,9 +74,14 @@ PROVIDERS: list[Provider] = [
         "gemini",
         "https://generativelanguage.googleapis.com/v1beta/openai",
         "GEMINI_API_KEY",
-        {FAST: "gemini-2.5-flash-lite",
-         ANALYTIC: "gemini-2.5-flash",
-         BROAD: "gemini-2.5-flash"},
+        # مُقاسة لا مفترضة (2026-08-30): gemini-2.5-flash تقاعد بـ404
+        # «no longer available to new users»، وgemini-flash-latest يردّ
+        # 503 تحت الضغط (0/2)، بينما gemini-3.5-flash نجح 2/2 في 3.5 ث
+        # وflash-lite-latest في 0.84 ث. إن تقاعد أحدها فالتجاوز التلقائي
+        # ينقل للتالي في السلسلة، ويكشفه: python providers.py
+        {FAST: "gemini-flash-lite-latest",
+         ANALYTIC: "gemini-3.5-flash",
+         BROAD: "gemini-3.5-flash"},
         kinds=(FAST, ANALYTIC, BROAD),
         note="سريع ومجاني - سياق مليون رمز"),
     Provider(

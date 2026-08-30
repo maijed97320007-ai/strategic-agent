@@ -14,8 +14,9 @@
 
    وفلسفة shadcn نفسها «انسخ الشيفرة وامتلكها» لا «ثبّت حزمة»، ونظامه
    قائم على متغيّرات CSS تنتقل كما هي. فالمنقول هنا هو الأصل لا تقليده:
-   قيم oklch من apps/v4/app/globals.css حرفياً، وتشريح المكوّنات من
-   ملفاتها (Card، Button، Badge، Tabs، Input، Table، Alert، Skeleton).
+   المنقول تشريح المكوّنات من ملفاتها (Card، Button، Badge، Tabs، Input،
+   Table، Alert، Skeleton) وبنية الرموز نفسها. أمّا القيم فلوحة خاصة
+   (انظر أدناه) لا لوحة shadcn المحايدة - وسببُ الاستبدال مذكور معها.
 
    الأيقونات Lucide - وهي مكتبة أيقونات shadcn نفسها. مساراتها منقولة
    حرفياً من مستودع lucide-icons/lucide (رخصة MIT) ومحقونة في الصفحة،
@@ -27,69 +28,77 @@
      الأصل مبنيّ لليسار-إلى-اليمين وواجهتنا عربية.
    ============================================================ */
 
+/* ============================================================
+   اللوحة: فحمي داكن بالأساس مع سماوي حيّ.
+
+   الداكن هو الوضع الافتراضي لا البديل. والملاحظة التي قادت إليه كانت
+   «باهتة وبلا شخصية»: المحايد التام (أبيض + أسود) هو مظهر shadcn الأصلي
+   ويعمل جيداً في مستند، لكن هذا برنامجُ عملٍ يُفتح ساعات - والرمادي
+   وحده يجعله يشبه ورقة لا أداة.
+
+   العلاج ليس إغراقه بالألوان: لون واحد حيّ (#38BDF8) يحمل كل ما هو
+   تفاعلي - الزرّ والتبويب النشط والرابط وحلقة التركيز - والباقي فحمي.
+   لون واحد مستعمل بجرأة أقوى شخصيةً من خمسة ألوان موزّعة بخجل.
+   ============================================================ */
+
 :root {
   --radius: 0.625rem;
 
-  /* الأرضية رمادية فاتحة والبطاقة بيضاء خالصة.
-     في shadcn الفاتح كلاهما أبيض (oklch 1 0 0) فلا تُرى البطاقة إلا بحدّ
-     شعرة - يعمل في تصميم مسطّح بحق، لكنه يضيع هنا حيث الصفحة مبنيّة من
-     بطاقات متجاورة. رفعُ الأرضية درجتين يعيد العمق بلا لون. */
-  --background: oklch(0.976 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
+  --background: #0b0f14;
+  --foreground: #e6edf3;
+  --card: #141a21;
+  --card-foreground: #e6edf3;
+  --popover: #141a21;
 
-  /* محايد تام - قيم shadcn الأصلية بلا تلوين. الأبيض والأسود وحدهما،
-     واللون محفوظ للإشارة وحدها: أحمر للخطأ وأخضر للنجاح. */
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: #38bdf8;
+  --primary-foreground: #06131c;
 
-  --secondary: oklch(0.951 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.951 0 0);
-  --muted-foreground: oklch(0.52 0 0);
-  --accent: oklch(0.951 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --secondary: #1b232c;
+  --secondary-foreground: #e6edf3;
+  --muted: #1b232c;
+  --muted-foreground: #93a4b3;
+  --accent: #1f2933;
+  --accent-foreground: #e6edf3;
 
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.55 0.13 155);
-  --warning: oklch(0.65 0.13 75);
+  --destructive: #f87171;
+  --destructive-foreground: #1a0b0b;
+  --success: #34d399;
+  --warning: #fbbf24;
 
-  --border: oklch(0.898 0 0);
-  --input: oklch(0.898 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: #232b34;
+  --input: #2a333d;
+  --ring: #38bdf8;
 
   --font: "Segoe UI", "Noto Sans Arabic", Tahoma, system-ui, sans-serif;
   --mono: "Cascadia Mono", "Consolas", ui-monospace, monospace;
 }
 
-:root[data-theme="dark"] {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
+/* النهاري يبقى متاحاً بالمبدّل - نفس اللون الحيّ بدرجة تصلح على الأبيض */
+:root[data-theme="light"] {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
 
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
+  --primary: #0284c7;
+  --primary-foreground: #ffffff;
 
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.371 0 0);
-    --accent-foreground: oklch(0.985 0 0);
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #eef2f7;
+  --accent-foreground: #0f172a;
 
-    --destructive: oklch(0.704 0.191 22.216);
-    --destructive-foreground: oklch(0.985 0 0);
-    --success: oklch(0.72 0.14 155);
-    --warning: oklch(0.78 0.13 80);
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --success: #059669;
+  --warning: #b45309;
 
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --border: #e2e8f0;
+  --input: #cbd5e1;
+  --ring: #0284c7;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -130,22 +139,25 @@ body::before, body::after {
 body::before {
   background-image: radial-gradient(
     circle at 1px 1px,
-    color-mix(in oklch, var(--foreground) 13%, transparent) 1px,
+    color-mix(in oklab, var(--foreground) 16%, transparent) 1px,
     transparent 0);
   background-size: 22px 22px;
-  opacity: .5;
+  opacity: .35;
   mask-image: radial-gradient(ellipse 100% 70% at 50% 0%, #000 35%, transparent 78%);
 }
 
-/* الهالات المنجرفة */
+/* الهالات المنجرفة.
+   ملوّنة بلون العلامة لا رمادية: الهالة الرمادية على أرضية رمادية لا
+   تُرى أصلاً، وهي بالضبط ما جعل الشكل «باهتاً». وشفافيتها تبقى منخفضة
+   فتُحسّ ولا تُقرأ. */
 body::after {
   background:
-    radial-gradient(38rem 30rem at 18% 12%,
-      color-mix(in oklch, var(--foreground) 7%, transparent), transparent 70%),
-    radial-gradient(32rem 26rem at 82% 8%,
-      color-mix(in oklch, var(--foreground) 5%, transparent), transparent 70%),
-    radial-gradient(42rem 34rem at 55% 88%,
-      color-mix(in oklch, var(--foreground) 6%, transparent), transparent 72%);
+    radial-gradient(40rem 32rem at 15% 8%,
+      color-mix(in oklab, var(--primary) 13%, transparent), transparent 68%),
+    radial-gradient(34rem 28rem at 85% 4%,
+      color-mix(in oklab, var(--success) 8%, transparent), transparent 68%),
+    radial-gradient(46rem 36rem at 55% 92%,
+      color-mix(in oklab, var(--primary) 9%, transparent), transparent 70%);
   animation: drift 34s ease-in-out infinite alternate;
   will-change: transform;
 }
@@ -156,16 +168,7 @@ body::after {
   100% { transform: translate3d(2%, -2.2%, 0) scale(1.03); }
 }
 
-:root[data-theme="dark"] body::before { opacity: .35; }
-:root[data-theme="dark"] body::after {
-  background:
-    radial-gradient(38rem 30rem at 18% 12%,
-      color-mix(in oklch, var(--foreground) 9%, transparent), transparent 70%),
-    radial-gradient(32rem 26rem at 82% 8%,
-      color-mix(in oklch, var(--foreground) 6%, transparent), transparent 70%),
-    radial-gradient(42rem 34rem at 55% 88%,
-      color-mix(in oklch, var(--foreground) 7%, transparent), transparent 72%);
-}
+:root[data-theme="light"] body::before { opacity: .45; }
 
 @media (prefers-reduced-motion: reduce) {
   body::after { animation: none; }
@@ -289,8 +292,11 @@ body::after {
 }
 .tabs-trigger:hover { color: var(--foreground); }
 .tabs-trigger[data-state="active"] {
-  background: var(--background); color: var(--foreground);
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / .1), 0 1px 2px -1px rgb(0 0 0 / .1);
+  /* انحراف مقصود عن shadcn: الأصل يجعل النشط بلون الأرضية مع ظلّ، وهي
+     إشارة خافتة على الفحمي. اللون الحيّ يقولها من مسافة. */
+  background: color-mix(in oklab, var(--primary) 16%, transparent);
+  color: var(--primary);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--primary) 28%, transparent);
 }
 .tabs-trigger:focus-visible {
   outline: none;
@@ -392,25 +398,23 @@ main {
 }
 .composer .textarea:focus-visible { box-shadow: none; }
 
-.picker { display: flex; gap: .375rem; flex-wrap: wrap; justify-content: center; margin-bottom: .75rem; }
-.mchip {
-  display: inline-flex; align-items: center; gap: .375rem;
+/* رقاقات التوجيه: من يعمل ومن يتصدّر */
+.routing {
+  display: flex; gap: .375rem; flex-wrap: wrap;
+  justify-content: center; margin-bottom: .875rem;
+}
+.pill {
+  display: inline-flex; align-items: center; gap: .3125rem;
   border: 1px solid var(--border); background: var(--card);
-  color: var(--muted-foreground); font-size: .8125rem;
-  padding: .25rem .75rem; border-radius: 9999px; cursor: pointer;
-  transition: border-color .15s, color .15s, background-color .15s;
+  color: var(--muted-foreground); font-size: .75rem;
+  padding: .1875rem .625rem; border-radius: 9999px;
 }
-.mchip:hover { border-color: var(--primary); }
-.mchip.on {
-  background: var(--primary); color: var(--primary-foreground);
-  border-color: var(--primary); font-weight: 600;
+.pill.on {
+  border-color: color-mix(in oklab, var(--primary) 45%, transparent);
+  background: color-mix(in oklab, var(--primary) 10%, transparent);
+  color: var(--primary); font-weight: 600;
 }
-.mchip.on .tag { background: color-mix(in oklch, var(--primary-foreground) 20%, transparent);
-  color: var(--primary-foreground); }
-.mchip .tag {
-  font-size: .6875rem; padding: 0 .375rem; border-radius: 9999px;
-  background: var(--muted); color: var(--muted-foreground);
-}
+.pill.on .i { color: var(--primary); }
 
 .hint {
   margin-top: .75rem; display: flex; gap: .5rem;
@@ -422,7 +426,10 @@ main {
   padding: .1875rem .75rem; border-radius: 9999px; cursor: pointer;
   transition: border-color .15s, color .15s;
 }
-.chip:hover { border-color: var(--primary); color: var(--primary); }
+.chip:hover {
+  border-color: color-mix(in oklab, var(--primary) 55%, transparent);
+  color: var(--primary);
+}
 
 /* التقدّم */
 .run { margin-top: 2rem; display: none; }
@@ -560,7 +567,6 @@ footer {
     <div class="logo">◆</div>
     <div class="brand">وكيل الأفكار الاستراتيجية</div>
     <div class="head-right">
-      <span class="badge badge-secondary mono" id="model">—</span>
       <button class="btn btn-ghost btn-icon" id="themeBtn" title="تبديل السمة"
               aria-label="تبديل السمة"></button>
     </div>
@@ -586,7 +592,7 @@ footer {
       <p>سبعة وكلاء يبحثون وينقدون ويستخرجون حلولاً تنفّذها بنفسك</p>
     </div>
 
-    <div class="picker" id="picker"></div>
+    <div class="routing" id="routing"></div>
 
     <div class="composer">
       <textarea class="textarea" id="topic" rows="1"
@@ -699,8 +705,9 @@ function setTheme(t) {
   if (b) b.innerHTML = icon(t === "dark" ? "sun" : "moon");
 }
 (function initTheme() {
-  let t = "light";
-  try { t = localStorage.getItem(THEME_KEY) || "light"; } catch (e) {}
+  // الداكن افتراضاً: هو الوضع الذي صُمّمت اللوحة له، والنهاري بديل.
+  let t = "dark";
+  try { t = localStorage.getItem(THEME_KEY) || "dark"; } catch (e) {}
   document.documentElement.dataset.theme = t;
 })();
 
@@ -759,32 +766,27 @@ function renderStages(activeIdx, notes) {
   $("bar").style.width = Math.round((activeIdx / stages.length) * 100) + "%";
 }
 
-let chosenModel = null;
+/* ---------- التوجيه ----------
+   لا مبدّل نماذج: النظام يستعمل ثلاثة نماذج في التشغيلة الواحدة حسب نوع
+   المهمة ويتجاوز الفاشل، فشريحة تقول «minimax-m3:free» كانت تصف واحداً
+   من ثلاثة وتوهم أنه الوحيد. اسم المزوّد أصدق وأقصر. */
+const PROVIDER_LABEL = {
+  gemini: "Gemini", groq: "Groq", cerebras: "Cerebras",
+  mistral: "Mistral", zai: "Z.ai", openrouter: "OpenRouter", ollama: "محلي",
+};
 
-function renderPicker(info) {
-  // النموذج السحابي أولاً: على عتاد بلا تسريع رسومي، المحلي أبطأ 10-20×.
-  const opts = [
-    { id: info.model, label: info.model.split("/").pop(), tag: info.is_local ? "محلي" : "سحابي" },
-    ...(info.local_models || [])
-      .filter(m => m.id !== info.model)
-      .map(m => ({ id: m.id, label: m.label, tag: `محلي · ${m.gb}GB` })),
-  ];
-  chosenModel = info.model;
-  $("picker").innerHTML = opts.map(o =>
-    `<span class="mchip${o.id === chosenModel ? " on" : ""}" data-id="${esc(o.id)}">
-       ${esc(o.label)}<span class="tag">${esc(o.tag)}</span></span>`).join("");
-  document.querySelectorAll(".mchip").forEach(c => {
-    c.onclick = () => {
-      chosenModel = c.dataset.id;
-      document.querySelectorAll(".mchip").forEach(x => x.classList.remove("on"));
-      c.classList.add("on");
-      $("model").textContent = chosenModel;
-      $("err").innerHTML = chosenModel.startsWith("ollama/")
-        ? `<div class="alert">النموذج المحلي يعمل بلا إنترنت وبلا تكلفة،
-           لكنه على هذا العتاد أبطأ 10-20 ضعفاً — احسب ساعة لا أربع دقائق.</div>`
-        : "";
-    };
-  });
+function renderRouting(info) {
+  const r = info.routing || {};
+  const ready = r.ready || [];
+  const active = r.routes ? [...new Set(Object.values(r.routes))].filter(Boolean) : [];
+  if (!ready.length) { $("routing").innerHTML = ""; return; }
+
+  $("routing").innerHTML = ready.map(n => {
+    const on = active.includes(n);
+    return `<span class="pill${on ? " on" : ""}"
+      title="${on ? "يتصدّر التوجيه" : "احتياط عند الفشل"}">
+      ${icon(on ? "zap" : "clock", "i-sm")}${esc(PROVIDER_LABEL[n] || n)}</span>`;
+  }).join("");
 }
 
 async function boot() {
@@ -794,8 +796,7 @@ async function boot() {
     return;
   }
   const r = await fetch("/api/info").then(x => x.json());
-  $("model").textContent = r.model;
-  renderPicker(r);
+  renderRouting(r);
   stages = r.stages.map(s => ({ label: s[0], hint: s[1], seconds: 0 }));
   $("chips").innerHTML = SUGGESTIONS
     .map(s => `<span class="chip">${esc(s)}</span>`).join("");
@@ -891,7 +892,7 @@ async function start() {
 
   try {
     const qs = "topic=" + encodeURIComponent(topic)
-      + (chosenModel ? "&model=" + encodeURIComponent(chosenModel) : "");
+      ;
     const res = await fetch("/api/run?" + qs);
     if (!res.ok) {
       const e = await res.json().catch(() => ({ error: "HTTP " + res.status }));
@@ -1089,7 +1090,7 @@ loaders.dash = { done: false, fn: async () => {
 loaders.svc = { done: false, fn: async () =>
   renderServices((await fetch("/api/services").then(x => x.json())).services) };
 
-setTheme(document.documentElement.dataset.theme || "light");
+setTheme(document.documentElement.dataset.theme || "dark");
 $("themeBtn").onclick = () =>
   setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
 
