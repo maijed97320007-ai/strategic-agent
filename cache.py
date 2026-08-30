@@ -32,12 +32,17 @@ def _db_path() -> str:
     فارغة جديدة، فتبدو الفرص والمعرفة والتنبؤات كلها ضائعة بلا رسالة خطأ.
     نثبّتها بجانب البرنامج، ويبقى KNOWLEDGE_DB لمن أراد مساراً آخر.
     """
-    if env := os.getenv("KNOWLEDGE_DB"):
-        return env
     if getattr(sys, "frozen", False):
         base = Path(sys.executable).parent
     else:
         base = Path(__file__).parent
+
+    # المسار النسبي يُحلّ من مجلد البرنامج لا من مجلد التشغيل - وإلا
+    # عاد نفس العطل الذي يعالجه هذا الحلّ من الباب الخلفي.
+    if env := os.getenv("KNOWLEDGE_DB"):
+        p = Path(env)
+        return str(p if p.is_absolute() else (base / p).resolve())
+
     return str(base / "knowledge.db")
 
 
