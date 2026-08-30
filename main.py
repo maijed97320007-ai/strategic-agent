@@ -56,7 +56,15 @@ MODEL = os.getenv("MODEL", "openrouter/minimax/minimax-m3:free")
 
 
 def _flag(name: str, default: str) -> bool:
-    return os.getenv(name, default).strip().lower() not in ("0", "false", "no")
+    """
+    قراءة علم منطقي من البيئة.
+
+    القيمة الفارغة تعني «غير محدَّد» لا «مفعّل»: سطر `MAKE_PDF=` في .env
+    كان يُقرأ كتفعيل لأن "" ليست ضمن قائمة النفي - فيولّد PDF لمن كتب
+    السطر ليعطّله.
+    """
+    raw = (os.getenv(name) or "").strip()
+    return (raw or default).lower() not in ("0", "false", "no")
 
 
 # سقف زمني صلب للتشغيلة كاملة. بلا هذا تعلّق التشغيلة أبداً عند تعثّر
