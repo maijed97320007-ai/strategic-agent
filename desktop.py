@@ -65,11 +65,43 @@ def _open_native(url: str) -> bool:
     try:
         webview.create_window(TITLE, url, width=WIDTH, height=HEIGHT,
                               min_size=(760, 560), text_select=True)
+        t0 = time.perf_counter()
         webview.start()          # يحجب حتى يغلق المستخدم النافذة
-        return True
     except Exception as e:
         print(f"تعذّرت النافذة الأصلية ({type(e).__name__}: {e})")
         return False
+
+    # عودة فورية تعني أن النافذة لم تُعرض أصلاً لا أن المستخدم أغلقها -
+    # يحدث حين يُشغَّل البرنامج بلا سطح مكتب مرئي (نافذة مخفية، جلسة
+    # خدمة). كان يُعدّ نجاحاً فيخرج البرنامج ويقتل تشغيلة جارية معه.
+    if time.perf_counter() - t0 < 2.0:
+        print("لم تُعرض النافذة الأصلية - نكمل بالمتصفح.")
+        return False
+    return True
+
+
+def _wait_for_run(limit: float = 1800) -> None:
+    """
+    لا نُنهي البرنامج وتشغيلة في منتصفها.
+
+    إغلاق النافذة يقتل العملية وفيها الخادم والخيط العامل، فيضيع تقرير
+    قطع نصف طريقه ولا يُحفظ منه شيء. ننتظر انتهاءها - والتشغيلة محكومة
+    أصلاً بسقف RUN_TIMEOUT فالانتظار محدود.
+    """
+    try:
+        import app
+    except Exception:
+        return
+    if not app._RUN_LOCK.locked():
+        return
+
+    print("تشغيلة جارية - ننتظر انتهاءها قبل الإغلاق (Ctrl+C للإنهاء فوراً).")
+    end = time.time() + limit
+    try:
+        while app._RUN_LOCK.locked() and time.time() < end:
+            time.sleep(2)
+    except KeyboardInterrupt:
+        print("أُنهي بطلبك - التشغيلة الجارية ستضيع.")
 
 
 def _open_app_window(url: str) -> bool:
@@ -99,7 +131,8 @@ def main() -> int:
     url = f"http://127.0.0.1:{port}"
 
     if _open_native(url):
-        return 0                        # أُغلقت النافذة - ننهي معها
+        _wait_for_run()                 # أُغلقت النافذة - ننهي بعد أي تشغيلة
+        return 0
 
     print(f"الواجهة على {url}")
     if not _open_app_window(url):
