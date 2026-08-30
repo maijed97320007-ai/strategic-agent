@@ -45,3 +45,6 @@ desktop.ini
 .idea/
 .vscode/
 *.swp
+
+# مولَّد آلياً بـ build_exe.py في كل بناء
+IdeaAgent.spec
