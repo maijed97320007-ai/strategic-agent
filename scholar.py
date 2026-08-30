@@ -67,6 +67,85 @@ def _is_latin(text: str) -> bool:
     return sum(c.isascii() for c in letters) / len(letters) > 0.6
 
 
+# معجم مصطلحات المجال: عربي → إنجليزي.
+#
+# لماذا معجم ونحن نملك نموذجاً؟ لأن نداء الترجمة كلّف **13.8 ثانية** مقيسة
+# على النموذج المجاني - أبطأ خطوة مفردة في التشغيلة كلها، وهي ترجمة ستّين
+# رمزاً. المعجم يغطّي المواضيع المتكرّرة بصفر مللي ثانية، والنموذج يبقى
+# احتياطاً لما لا يغطّيه.
+#
+# الترتيب مقصود: المركّبات قبل المفردات، وإلا التهمت «مياه» عبارة
+# «مياه الصرف الصحي» فضاعت الدقّة.
+TERMS: list[tuple[str, str]] = [
+    ("التناضح العكسي", "reverse osmosis"),
+    ("التناضح الأمامي", "forward osmosis"),
+    ("مياه الصرف الصحي", "wastewater"),
+    ("مياه الصرف", "wastewater"),
+    ("المياه المصاحبة", "produced water"),
+    ("مياه البحر", "seawater"),
+    ("المياه الجوفية", "groundwater"),
+    ("مياه الآبار", "well water"),
+    ("مياه الشرب", "drinking water"),
+    ("إعادة الاستخدام", "water reuse"),
+    ("إعادة استخدام", "water reuse"),
+    ("الصناعي", "industrial"),
+    ("الصناعية", "industrial"),
+    ("البلدية", "municipal"),
+    ("الزراعي", "agricultural"),
+    ("الري", "irrigation"),
+    ("الغسيل الكيميائي", "chemical cleaning"),
+    ("المعالجة المسبقة", "pretreatment"),
+    ("الضغط التفاضلي", "differential pressure"),
+    ("الرفض الملحي", "salt rejection"),
+    ("الانسداد الحيوي", "biofouling"),
+    ("الترسيب الكلسي", "scaling"),
+    ("المحلول المركّز", "brine"),
+    ("التحلية", "desalination"),
+    ("تحلية", "desalination"),
+    ("الأغشية", "membrane"),
+    ("أغشية", "membrane"),
+    ("غشاء", "membrane"),
+    ("الترشيح الفائق", "ultrafiltration"),
+    ("الترشيح النانوي", "nanofiltration"),
+    ("النترات", "nitrate"),
+    ("الفلورايد", "fluoride"),
+    ("الزرنيخ", "arsenic"),
+    ("الليثيوم", "lithium"),
+    ("الملوحة", "salinity"),
+    ("العكارة", "turbidity"),
+    ("التلوث", "fouling"),
+    ("الطاقة الشمسية", "solar"),
+    ("استهلاك الطاقة", "energy consumption"),
+    ("الصيانة", "maintenance"),
+    ("التشغيل", "operation"),
+    ("التصميم", "design"),
+    ("المحطات", "plant"),
+    ("محطة", "plant"),
+    ("المعالجة", "treatment"),
+    ("معالجة", "treatment"),
+    ("المياه", "water"),
+    ("مياه", "water"),
+]
+
+
+def glossary_query(topic: str) -> str:
+    """
+    استعلام إنجليزي من المعجم بلا نموذج.
+
+    يعيد "" إن لم يطابق مصطلحين فأكثر - مصطلح واحد استعلام أعمى يجرّ
+    أوراقاً بعيدة، وقد رُصد ذلك: استعلام فضفاض أعاد ورقة عن Pinch Analysis.
+    """
+    t = " ".join(topic.split())
+    out: list[str] = []
+    for ar, en in TERMS:
+        if ar in t and en not in out:
+            out.append(en)
+            t = t.replace(ar, " ")       # يمنع «مياه» من التقاط ما استُهلك
+        if len(out) >= 5:
+            break
+    return " ".join(out) if len(out) >= 2 else ""
+
+
 def english_query(topic: str) -> str:
     """
     يحوّل الموضوع إلى استعلام أكاديمي إنجليزي.
@@ -79,9 +158,16 @@ def english_query(topic: str) -> str:
 
     import cache
 
-    ck = f"__scholar_q__::{topic}"
-    if (hit := cache.get(ck)) and isinstance(hit, str):
+    # سقف طويل عمداً: الترجمة لا تتقادم كما تتقادم نتيجة بحث، وإعادتها
+    # تكلّف 13.8 ثانية مقيسة - أبطأ خطوة مفردة في التشغيلة.
+    ck = f"__scholar_q__::{' '.join(topic.split())}"
+    if (hit := cache.get(ck, ttl_hours=24 * 365)) and isinstance(hit, str):
         return hit
+
+    # المعجم أولاً: يغطّي المواضيع المتكرّرة فوراً ويوفّر نداءً كاملاً
+    if q := glossary_query(topic):
+        cache.put(ck, q)
+        return q
 
     try:
         import providers

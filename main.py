@@ -177,16 +177,32 @@ def prefetch_research(topic: str, max_queries: int = 4):
 
     import cache
 
-    # ── القواعد العلمية أولاً ──
-    # الترتيب مقصود: الوكلاء يستشهدون بأوائل السجل أكثر، وحصر النطاق بـ
-    # site: لم يكفِ لأن الدوريات لا تتصدّر البحث العام أصلاً. نسألها
-    # مباشرةً بدل أن نرجو محرّكاً تجارياً أن يعيدها.
-    try:
-        import scholar
-        for it in scholar.search(topic, k=8):
-            reg.add(it["title"], it["url"], it["snippet"], "قاعدة علمية")
-    except Exception:
-        pass                       # المصدر العلمي إضافة لا شرط
+    # ── كل النداءات معاً ──
+    #
+    # كان هذا تسلسلياً فكلّف 25.5 ثانية مقيسة: ترجمة الاستعلام 13.8 ث،
+    # ثم القواعد العلمية 3.6 ث، ثم سبعة استعلامات بحث × 2.1 ث. وكلها
+    # **انتظار شبكة لا حساب**، فتسلسلها إهدار خالص - المجموع يساوي أبطأ
+    # نداء وحده حين تتوازى.
+    #
+    # الترتيب في السجل يبقى ثابتاً رغم التوازي: نجمع النتائج ثم نضيفها
+    # بترتيب مقصود. العلمية أولاً لأن الوكلاء يستشهدون بأوائل السجل أكثر.
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _scholar():
+        try:
+            import scholar
+            return scholar.search(topic, k=8)
+        except Exception:
+            return []              # المصدر العلمي إضافة لا شرط
+
+    with ThreadPoolExecutor(max_workers=len(queries) + 1) as pool:
+        fut_sch = pool.submit(_scholar)
+        futs = [(q, pool.submit(cache.cached_search, tool, q)) for q in queries]
+        results = [(q, f.result()) for q, f in futs]
+        scholarly_hits = fut_sch.result()
+
+    for it in scholarly_hits:
+        reg.add(it["title"], it["url"], it["snippet"], "قاعدة علمية")
 
     # ── البحث العام ──
     # سقف نطاقين لكل موقع: تسع صفحات من مورّد واحد كانت تُغرق السجل وتُوهم
@@ -194,8 +210,7 @@ def prefetch_research(topic: str, max_queries: int = 4):
     from urllib.parse import urlparse
 
     per_host: dict[str, int] = {}
-    for q in queries:
-        raw = cache.cached_search(tool, q)
+    for q, raw in results:
         if raw is None:
             continue
         organic = (raw or {}).get("organic", []) if isinstance(raw, dict) else []

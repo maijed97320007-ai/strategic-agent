@@ -64,6 +64,7 @@ def _local_models() -> list[dict]:
 
 
 async def info(_request):
+    _touch()          # فتح الصفحة = المستخدم حاضر
     return JSONResponse({
         "model": core.MODEL,
         "is_local": core.is_local(),
@@ -88,6 +89,21 @@ def _sse(event: str, data: dict) -> str:
 # الحالة ونتيح الإلغاء.
 _RUN_LOCK = threading.Lock()
 _ACTIVE: dict = {}       # {"topic", "started", "stage"} حين تكون تشغيلة جارية
+
+# آخر لمسة من المستخدم. الجدولة تؤجّل جولتها ما دام قريباً: جولة الكشف
+# تحتجز قفل التشغيل نحو دقيقة، فخطفها قبل المستخدم يردّ تشغيلته برسالة
+# «هناك تشغيلة جارية» ويبدو البرنامج بطيئاً أو معطّلاً بلا سبب ظاهر.
+_LAST_TOUCH: float = 0.0
+IDLE_BEFORE_AUTO = float(os.getenv("IDLE_BEFORE_AUTO_MIN", "10")) * 60
+
+
+def _touch() -> None:
+    global _LAST_TOUCH
+    _LAST_TOUCH = time.time()
+
+
+def _user_active() -> bool:
+    return (time.time() - _LAST_TOUCH) < IDLE_BEFORE_AUTO
 
 
 def _run_state() -> dict:
@@ -125,6 +141,7 @@ async def cancel(_request):
 
 
 async def run(request):
+    _touch()
     topic = (request.query_params.get("topic") or "").strip()
     if not topic:
         return JSONResponse({"error": "لا يوجد موضوع"}, status_code=400)
@@ -238,6 +255,7 @@ async def service_run(request):
     نفس الموارد - وهو ما أنتج سابقاً RuntimeError: Executor is already
     running. الرفض الصريح أوضح من تعثّر غامض بعد دقيقتين.
     """
+    _touch()
     try:
         payload = await request.json()
     except Exception:
@@ -325,7 +343,8 @@ def start(open_browser: bool = True) -> None:
     try:
         import scheduler
         if scheduler.start(acquire=lambda: _RUN_LOCK.acquire(blocking=False),
-                           release=_RUN_LOCK.release):
+                           release=_RUN_LOCK.release,
+                           defer_if=_user_active):
             print(f"التحديث التلقائي: كل {scheduler.HOURS:g} ساعة")
         elif scheduler.HOURS <= 0:
             print("التحديث التلقائي: معطّل")

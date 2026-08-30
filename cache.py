@@ -53,10 +53,17 @@ def _key(query: str) -> str:
     return hashlib.sha256(q.encode("utf-8")).hexdigest()[:20]
 
 
-def get(query: str, path: str = DB):
-    """يعيد النتيجة المحفوظة إن كانت طازجة، وإلا None."""
+def get(query: str, path: str = DB, ttl_hours: float | None = None):
+    """
+    يعيد النتيجة المحفوظة إن كانت طازجة، وإلا None.
+
+    `ttl_hours` يتجاوز السقف العام: نتيجة بحث تتقادم في ساعات، لكن ترجمة
+    موضوع إلى استعلام إنجليزي لا تتقادم أبداً - وإعادتها كلّفت 13.8 ثانية
+    مقيسة على نموذج مجاني، وهي أبطأ خطوة في التشغيلة كلها.
+    """
     if not ENABLED:
         return None
+    ttl = TTL_HOURS if ttl_hours is None else ttl_hours
     try:
         con = _db(path)
         row = con.execute("SELECT payload, stored_at FROM search_cache WHERE key=?",
@@ -64,7 +71,7 @@ def get(query: str, path: str = DB):
         if not row:
             con.close()
             return None
-        if (time.time() - row["stored_at"]) / 3600 > TTL_HOURS:
+        if (time.time() - row["stored_at"]) / 3600 > ttl:
             con.execute("DELETE FROM search_cache WHERE key=?", (_key(query),))
             con.commit()
             con.close()

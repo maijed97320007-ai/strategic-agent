@@ -119,11 +119,14 @@ def run_once(force: bool = False) -> dict:
     return state
 
 
-def _loop(acquire=None, release=None) -> None:
+def _loop(acquire=None, release=None, defer_if=None) -> None:
     if _stop.wait(FIRST_DELAY):
         return
     while not _stop.is_set():
-        if due():
+        # الأولوية للمستخدم: الجولة تأخذ قفل التشغيل نحو دقيقة، فإن
+        # خطفته قبله رُفضت تشغيلته برسالة «هناك تشغيلة جارية» وبدا
+        # البرنامج معطّلاً. التأجيل هنا يمنع ذلك قبل أن يقع.
+        if due() and not (defer_if and defer_if()):
             got = True
             if acquire is not None:
                 got = acquire()
@@ -140,13 +143,13 @@ def _loop(acquire=None, release=None) -> None:
             return
 
 
-def start(acquire=None, release=None) -> bool:
+def start(acquire=None, release=None, defer_if=None) -> bool:
     """يشغّل الخيط. يعيد False إن كانت الجدولة معطّلة أو تعمل أصلاً."""
     global _thread
     if HOURS <= 0 or (_thread and _thread.is_alive()):
         return False
     _stop.clear()
-    _thread = threading.Thread(target=_loop, args=(acquire, release),
+    _thread = threading.Thread(target=_loop, args=(acquire, release, defer_if),
                                daemon=True, name="scheduler")
     _thread.start()
     return True
