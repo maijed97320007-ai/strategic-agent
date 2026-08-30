@@ -3,13 +3,16 @@
 
 تشغيل:  .venv/Scripts/python.exe build_exe.py
 
-ملاحظة مهمة: الـEXE لا يتضمن مفاتيح API. يجب أن يكون ملف .env
-بجانب الـEXE عند التشغيل - main.py يقرأه من مجلد العمل.
+ملاحظة مهمة: الـEXE لا يتضمن مفاتيح API - المفاتيح لا تُدفن في ملف
+تنفيذي يُوزَّع. يُنسخ .env بجانبه، وmain.app_dir() يقرأه من **مجلد
+البرنامج** لا مجلد التشغيل (كان يقرأ من الثاني فلا يجد الملف حين
+يُشغَّل الـEXE من مجلد آخر، ويسقط بـ«المفتاح غير موجود»).
 """
 import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).parent
@@ -65,9 +68,40 @@ COLLECT = ["crewai", "crewai_tools", "chromadb", "tiktoken_ext", "litellm",
            "webview"]   # pywebview يحمّل واجهاته الخلفية ديناميكياً
 
 
+def kill_running() -> int:
+    """
+    يُنهي نسخاً عاملة من البرنامج قبل حذف dist.
+
+    ويندوز يقفل الملفات المفتوحة، فنسخة تعمل تحتجز _internal/**/*.pyd
+    ويفشل البناء بـPermissionError على ملف عشوائي - رسالة لا تدلّ على
+    السبب إطلاقاً. رُصد فعلياً بعد ترك نسخة اختبار تعمل.
+    """
+    killed = 0
+    try:
+        out = subprocess.run(["taskkill", "/F", "/IM", f"{NAME}.exe"],
+                             capture_output=True, text=True)
+        if out.returncode == 0:
+            killed = out.stdout.count("SUCCESS") or 1
+    except (OSError, subprocess.SubprocessError):
+        pass
+    if killed:
+        print(f"أُنهيت {killed} نسخة عاملة من {NAME}.exe")
+        time.sleep(2)
+    return killed
+
+
 def main() -> int:
+    kill_running()
     for d in ("build", "dist"):
-        shutil.rmtree(ROOT / d, ignore_errors=True)
+        try:
+            shutil.rmtree(ROOT / d)
+        except FileNotFoundError:
+            pass
+        except PermissionError as e:
+            print()
+            print(f"تعذّر حذف {d}: ملف محتجَز — {e.filename}")
+            print("أغلق أي نسخة عاملة من البرنامج ثم أعد المحاولة.")
+            return 1
 
     cmd = [
         sys.executable, "-m", "PyInstaller",
