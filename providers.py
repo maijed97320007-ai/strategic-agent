@@ -2,7 +2,7 @@
 موجّه المزوّدين - يختار النموذج حسب نوع المهمة ويتجاوز الفشل تلقائياً.
 
     مهمة قصيرة    → Groq / Cerebras      (أسرع استدلال متاح مجاناً)
-    مهمة تحليلية  → Mistral / Z.ai       (استدلال أعمق)
+    مهمة تحليلية  → Gemini / Mistral      (استدلال أعمق وسياق مليون رمز)
     عدة نماذج     → OpenRouter           (أوسع تشكيلة تحت مفتاح واحد)
     بلا إنترنت    → Ollama               (محلي بالكامل)
     فشل المزوّد   → تجاوز تلقائي للتالي
@@ -67,6 +67,18 @@ PROVIDERS: list[Provider] = [
         "cerebras", "https://api.cerebras.ai/v1", "CEREBRAS_API_KEY",
         {FAST: "llama-3.3-70b", ANALYTIC: "qwen-3-235b-a22b-instruct"},
         kinds=(FAST,), note="استدلال فائق السرعة"),
+    # Gemini: طبقة مجانية سخيّة وسياق مليون رمز. crewai/litellm يتعرّف
+    # على البادئة `gemini/` مباشرةً ويقرأ GEMINI_API_KEY بنفسه، وللمنفذ
+    # المتوافق مع OpenAI عنوانٌ معلن نضعه هنا لمن يستعمل LLM_BASE_URL.
+    Provider(
+        "gemini",
+        "https://generativelanguage.googleapis.com/v1beta/openai",
+        "GEMINI_API_KEY",
+        {FAST: "gemini-2.5-flash-lite",
+         ANALYTIC: "gemini-2.5-flash",
+         BROAD: "gemini-2.5-flash"},
+        kinds=(FAST, ANALYTIC, BROAD),
+        note="سريع ومجاني - سياق مليون رمز"),
     Provider(
         "mistral", "https://api.mistral.ai/v1", "MISTRAL_API_KEY",
         {ANALYTIC: "mistral-large-latest", FAST: "mistral-small-latest"},
@@ -90,9 +102,9 @@ PROVIDERS: list[Provider] = [
 
 # ترتيب التفضيل لكل نوع مهمة. الأول هو الأنسب، والبقية احتياط.
 ROUTES: dict[str, tuple[str, ...]] = {
-    FAST:     ("groq", "cerebras", "openrouter", "ollama"),
-    ANALYTIC: ("mistral", "zai", "openrouter", "cerebras", "ollama"),
-    BROAD:    ("openrouter", "zai", "mistral", "ollama"),
+    FAST:     ("groq", "cerebras", "gemini", "openrouter", "ollama"),
+    ANALYTIC: ("gemini", "mistral", "zai", "openrouter", "cerebras", "ollama"),
+    BROAD:    ("gemini", "openrouter", "zai", "mistral", "ollama"),
     LOCAL:    ("ollama",),
 }
 

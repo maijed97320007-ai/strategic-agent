@@ -5,419 +5,552 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>وكيل الأفكار الاستراتيجية</title>
 <style>
-  :root {
-    --bg: #faf9f7;
-    --surface: #ffffff;
-    --raised: #f5f3f0;
-    --border: #e6e2dc;
-    --border-strong: #d4cfc7;
-    --text: #1f1e1c;
-    --text-soft: #6b6862;
-    --text-faint: #9a958d;
-    --accent: #c65f3f;
-    --accent-soft: #f2e4de;
-    --ok: #2e7d63;
-    --warn: #b8860b;
-    --radius: 12px;
-    --radius-sm: 8px;
-    --font: "Segoe UI", "Noto Sans Arabic", "Tahoma", system-ui, sans-serif;
-    --mono: "Cascadia Mono", "Consolas", ui-monospace, monospace;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #1c1b19;
-      --surface: #262523;
-      --raised: #2f2e2b;
-      --border: #3a3835;
-      --border-strong: #4a4744;
-      --text: #f0eeea;
-      --text-soft: #a8a49d;
-      --text-faint: #75716b;
-      --accent: #e08464;
-      --accent-soft: #3a2a24;
-    }
-  }
+/* ============================================================
+   نظام shadcn/ui منقولاً إلى CSS خالص.
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+   لماذا نقل لا تثبيت؟ shadcn/ui حزمة React + Tailwind + Radix مع خطوة
+   بناء. إدخالها هنا يعني Node في مسار بناء الـEXE ومئات الكيلوبايتات من
+   JS، وهو يناقض ما بُني عليه هذا البرنامج: صفر تبعيات وإقلاع 0.13 ثانية.
 
-  body {
-    font-family: var(--font);
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.75;
-    font-size: 15px;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
+   وفلسفة shadcn نفسها «انسخ الشيفرة وامتلكها» لا «ثبّت حزمة»، ونظامه
+   قائم على متغيّرات CSS تنتقل كما هي. فالمنقول هنا هو الأصل لا تقليده:
+   قيم oklch من apps/v4/app/globals.css حرفياً، وتشريح المكوّنات من
+   ملفاتها (Card، Button، Badge، Tabs، Input، Table، Alert، Skeleton).
 
-  /* ---------- الترويسة ---------- */
-  header {
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
-    position: sticky; top: 0; z-index: 20;
-  }
-  .head-inner {
-    max-width: 780px; margin: 0 auto;
-    padding: 14px 24px;
-    display: flex; align-items: center; gap: 12px;
-  }
-  .logo {
-    width: 26px; height: 26px; flex: none;
-    border-radius: 7px;
-    background: var(--accent);
-    display: grid; place-items: center;
-    color: #fff; font-size: 13px; font-weight: 700;
-  }
-  .brand { font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
-  /* المجموعة كلها تُدفع للطرف، لا .model وحدها: الدفع من داخلها كان
-     يقذف الأزرار التي بعدها خارج العرض تماماً فلا يمكن النقر عليها. */
-  .head-right {
-    margin-inline-start: auto;
-    display: flex; align-items: center; gap: 8px;
-    flex-wrap: wrap; justify-content: flex-end;
-  }
-  .model {
-    font-family: var(--mono); font-size: 11.5px;
-    color: var(--text-faint);
-    direction: ltr; unicode-bidi: embed;
-    background: var(--raised);
-    padding: 3px 9px; border-radius: 20px;
-    border: 1px solid var(--border);
-  }
+   الأيقونات Lucide - وهي مكتبة أيقونات shadcn نفسها. مساراتها منقولة
+   حرفياً من مستودع lucide-icons/lucide (رخصة MIT) ومحقونة في الصفحة،
+   فلا CDN ولا حزمة ولا طلب شبكة: أيقونة لا تظهر بلا إنترنت أسوأ من
+   أيقونة غير موجودة.
 
-  /* ---------- الجسم ---------- */
-  main {
-    flex: 1; width: 100%;
-    max-width: 780px; margin: 0 auto;
-    padding: 0 24px 80px;
-  }
+   ما غُيّر عمداً:
+   · الخصائص المنطقية (padding-inline لا padding-left) في كل موضع، لأن
+     الأصل مبنيّ لليسار-إلى-اليمين وواجهتنا عربية.
+   ============================================================ */
 
-  .hero { padding: 64px 0 32px; text-align: center; }
-  .hero h1 {
-    font-size: 30px; font-weight: 600;
-    letter-spacing: -0.02em; line-height: 1.35;
-    margin-bottom: 10px;
-  }
-  .hero p { color: var(--text-soft); font-size: 15px; }
+:root {
+  --radius: 0.625rem;
 
-  /* ---------- صندوق الإدخال ---------- */
-  .composer {
-    background: var(--surface);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius);
-    padding: 6px;
-    display: flex; align-items: flex-end; gap: 6px;
-    transition: border-color .15s, box-shadow .15s;
-  }
-  .composer:focus-within {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-soft);
-  }
-  .composer textarea {
-    flex: 1; border: 0; outline: 0; resize: none;
-    background: transparent; color: var(--text);
-    font: inherit; line-height: 1.6;
-    padding: 10px 12px; max-height: 180px;
-  }
-  .composer textarea::placeholder { color: var(--text-faint); }
+  /* الأرضية رمادية فاتحة والبطاقة بيضاء خالصة.
+     في shadcn الفاتح كلاهما أبيض (oklch 1 0 0) فلا تُرى البطاقة إلا بحدّ
+     شعرة - يعمل في تصميم مسطّح بحق، لكنه يضيع هنا حيث الصفحة مبنيّة من
+     بطاقات متجاورة. رفعُ الأرضية درجتين يعيد العمق بلا لون. */
+  --background: oklch(0.976 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
 
-  button.send {
-    flex: none; border: 0; cursor: pointer;
-    background: var(--accent); color: #fff;
-    width: 34px; height: 34px; border-radius: var(--radius-sm);
-    display: grid; place-items: center;
-    transition: opacity .15s;
-    margin-bottom: 3px;
-  }
-  button.send:hover:not(:disabled) { opacity: .88; }
-  button.send:disabled { opacity: .3; cursor: not-allowed; }
-  button.send svg { width: 15px; height: 15px; }
+  /* محايد تام - قيم shadcn الأصلية بلا تلوين. الأبيض والأسود وحدهما،
+     واللون محفوظ للإشارة وحدها: أحمر للخطأ وأخضر للنجاح. */
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
 
-  /* مبدّل النموذج */
-  .picker {
-    display: flex; gap: 6px; flex-wrap: wrap;
-    justify-content: center; margin-bottom: 12px;
-  }
-  .mchip {
-    display: inline-flex; align-items: center; gap: 6px;
-    border: 1px solid var(--border); background: var(--surface);
-    color: var(--text-soft); font-size: 12.5px;
-    padding: 5px 12px; border-radius: 20px; cursor: pointer;
-    transition: all .15s;
-  }
-  .mchip:hover { border-color: var(--accent); }
-  .mchip.on {
-    border-color: var(--accent); color: var(--accent);
-    background: var(--accent-soft); font-weight: 600;
-  }
-  .mchip .tag {
-    font-size: 10.5px; padding: 1px 6px; border-radius: 10px;
-    background: var(--raised); color: var(--text-faint);
-    border: 1px solid var(--border);
-  }
-  .mchip.on .tag { background: var(--surface); }
+  --secondary: oklch(0.951 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.951 0 0);
+  --muted-foreground: oklch(0.52 0 0);
+  --accent: oklch(0.951 0 0);
+  --accent-foreground: oklch(0.205 0 0);
 
-  .hint {
-    margin-top: 10px; font-size: 12.5px; color: var(--text-faint);
-    display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
-  }
-  .chip {
-    background: var(--raised); border: 1px solid var(--border);
-    padding: 4px 11px; border-radius: 20px; cursor: pointer;
-    transition: border-color .15s, color .15s;
-  }
-  .chip:hover { border-color: var(--accent); color: var(--accent); }
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --success: oklch(0.55 0.13 155);
+  --warning: oklch(0.65 0.13 75);
 
-  /* ---------- التقدّم ---------- */
-  .run { margin-top: 36px; display: none; }
-  .run.on { display: block; }
+  --border: oklch(0.898 0 0);
+  --input: oklch(0.898 0 0);
+  --ring: oklch(0.708 0 0);
 
-  .run-head {
-    display: flex; align-items: baseline; gap: 10px;
-    padding-bottom: 14px; margin-bottom: 6px;
-    border-bottom: 1px solid var(--border);
-  }
-  .run-topic { font-weight: 600; font-size: 16px; flex: 1; }
-  .run-time {
-    font-family: var(--mono); font-size: 12px; color: var(--text-faint);
-    direction: ltr; unicode-bidi: embed;
-  }
+  --font: "Segoe UI", "Noto Sans Arabic", Tahoma, system-ui, sans-serif;
+  --mono: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+}
 
-  .track { height: 3px; background: var(--border); border-radius: 3px; overflow: hidden; }
-  .track > i {
-    display: block; height: 100%; width: 0;
-    background: var(--accent);
-    transition: width .5s ease;
-  }
+:root[data-theme="dark"] {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.205 0 0);
 
-  ol.stages { list-style: none; margin-top: 20px; }
-  ol.stages li {
-    display: flex; align-items: flex-start; gap: 12px;
-    padding: 9px 0;
-    color: var(--text-faint);
-    transition: color .2s;
-  }
-  ol.stages li .dot {
-    flex: none; width: 16px; height: 16px; margin-top: 5px;
-    border-radius: 50%;
-    border: 1.5px solid var(--border-strong);
-    display: grid; place-items: center;
-    transition: all .2s;
-  }
-  ol.stages li .body { flex: 1; min-width: 0; }
-  ol.stages li .label { font-size: 14.5px; }
-  ol.stages li .note {
-    font-size: 12.5px; color: var(--text-faint); margin-top: 1px;
-  }
-  ol.stages li .t {
-    font-family: var(--mono); font-size: 11.5px; color: var(--text-faint);
-    direction: ltr; unicode-bidi: embed; flex: none; margin-top: 4px;
-  }
+    --primary: oklch(0.922 0 0);
+    --primary-foreground: oklch(0.205 0 0);
 
-  li.active { color: var(--text); }
-  li.active .label { font-weight: 600; }
-  li.active .dot {
-    border-color: var(--accent);
-    border-top-color: transparent;
-    animation: spin .7s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.371 0 0);
+    --accent-foreground: oklch(0.985 0 0);
 
-  li.done { color: var(--text-soft); }
-  li.done .dot { border-color: var(--ok); background: var(--ok); }
-  li.done .dot::after {
-    content: ""; width: 4px; height: 7px;
-    border: solid #fff; border-width: 0 0 1.5px 1.5px;
-    transform: rotate(-45deg) translate(1px, -1px);
-  }
+    --destructive: oklch(0.704 0.191 22.216);
+    --destructive-foreground: oklch(0.985 0 0);
+    --success: oklch(0.72 0.14 155);
+    --warning: oklch(0.78 0.13 80);
 
-  /* ---------- النتيجة ---------- */
-  .result { margin-top: 30px; display: none; }
-  .result.on { display: block; }
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-  }
-  .card-head {
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 10px;
-    background: var(--raised);
-  }
-  .card-head .tick {
-    width: 18px; height: 18px; border-radius: 50%;
-    background: var(--ok); flex: none;
-    display: grid; place-items: center;
-  }
-  .card-head .tick::after {
-    content: ""; width: 4px; height: 8px;
-    border: solid #fff; border-width: 0 0 1.5px 1.5px;
-    transform: rotate(-45deg) translate(1px, -1px);
-  }
-  .card-head b { font-size: 14.5px; font-weight: 600; }
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+}
 
-  dl.facts { padding: 6px 20px 16px; }
-  dl.facts div {
-    display: flex; gap: 16px; align-items: baseline;
-    padding: 7px 0;
-    border-bottom: 1px solid var(--border);
-  }
-  dl.facts div:last-child { border-bottom: 0; }
-  dl.facts dt { color: var(--text-soft); font-size: 13px; width: 120px; flex: none; }
-  dl.facts dd { font-weight: 600; font-size: 13.5px; min-width: 0; word-break: break-all; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
-  .actions { display: flex; gap: 8px; padding: 0 20px 18px; flex-wrap: wrap; }
-  .btn {
-    border: 1px solid var(--border-strong); background: var(--surface);
-    color: var(--text); font: inherit; font-size: 13.5px;
-    padding: 7px 16px; border-radius: var(--radius-sm);
-    cursor: pointer; text-decoration: none;
-    transition: border-color .15s, color .15s;
-  }
-  .btn:hover { border-color: var(--accent); color: var(--accent); }
-  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-  .btn.primary:hover { opacity: .88; color: #fff; }
+body {
+  font-family: var(--font);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 14px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
 
-  .note-box {
-    margin-top: 14px; padding: 11px 16px;
-    border: 1px solid var(--border); border-radius: var(--radius-sm);
-    background: var(--raised);
-    font-size: 13px; color: var(--text-soft);
-  }
-  .note-box code {
-    font-family: var(--mono); font-size: 12px;
-    direction: ltr; unicode-bidi: embed; display: inline-block;
-    background: var(--surface); padding: 1px 6px; border-radius: 4px;
-    border: 1px solid var(--border);
-  }
+::selection { background: var(--primary); color: var(--primary-foreground); }
 
-  .alert {
-    margin-top: 14px; padding: 12px 16px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--warn); color: var(--warn);
-    background: transparent; font-size: 13.5px;
-  }
-  .alert.bad { border-color: #c0392b; color: #c0392b; }
+/* ---------- الخلفية الحية ----------
+   طبقتان ثابتتان خلف كل شيء بـz-index سالب:
 
-  /* ---------- لوحة المعلومات ---------- */
-  .navbtn {
-    /* .model يحمل margin-inline-start:auto فيدفع المجموعة يساراً */
-    border: 1px solid var(--border-strong); background: var(--surface);
-    color: var(--text-soft); font: inherit; font-size: 13px;
-    padding: 5px 13px; border-radius: var(--radius-sm); cursor: pointer;
-    transition: border-color .15s, color .15s;
-  }
-  .navbtn:hover, .navbtn.on { border-color: var(--accent); color: var(--accent); }
+   · شبكة نقاط ساكنة تعطي إحساس السطح بدل الفراغ الأملس.
+   · ثلاث هالات كبيرة تنجرف ببطء شديد (24-40 ثانية للدورة) فتبدو الصفحة
+     حيّة بلا أن تُلهي. الانجراف بـtransform وحده - لا خصائص تُعيد تخطيط
+     الصفحة - فيبقى على بطاقة الرسوميات ولا يُثقل المعالج.
 
-  .dash { display: none; margin-top: 26px; }
-  .dash.on { display: block; }
-  .dash h2 {
-    font-size: 13px; font-weight: 600; color: var(--text-soft);
-    margin: 22px 0 9px; letter-spacing: .2px;
-  }
-  .dash h2:first-child { margin-top: 0; }
-  .dash .empty { color: var(--text-faint); font-size: 13px; padding: 4px 0; }
+   شفافيتها منخفضة عمداً: خلفية تنافس النصّ على الانتباه عيبٌ لا ميزة،
+   وهذه تُرى حين تنظر إليها ولا تُرى حين تقرأ.
 
-  .grid2 { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
-  @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } }
+   وتتوقّف كلياً مع prefers-reduced-motion - الحركة المستمرة تؤذي من
+   لديه حساسية للحركة، وليست الرسالة التي تنقلها الصفحة. */
+body::before, body::after {
+  content: ""; position: fixed; inset: 0;
+  z-index: -1; pointer-events: none;
+}
 
-  .tile {
-    border: 1px solid var(--border); border-radius: var(--radius-sm);
-    background: var(--surface); padding: 12px 15px;
-  }
-  .tile .big { font-size: 21px; font-weight: 600; }
-  .tile .cap { font-size: 12.5px; color: var(--text-soft); margin-top: 3px; }
+/* شبكة النقاط */
+body::before {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    color-mix(in oklch, var(--foreground) 13%, transparent) 1px,
+    transparent 0);
+  background-size: 22px 22px;
+  opacity: .5;
+  mask-image: radial-gradient(ellipse 100% 70% at 50% 0%, #000 35%, transparent 78%);
+}
 
-  ul.opps { list-style: none; display: grid; gap: 7px; }
-  ul.opps li {
-    display: flex; align-items: flex-start; gap: 11px;
-    border: 1px solid var(--border); border-radius: var(--radius-sm);
-    background: var(--surface); padding: 10px 13px;
-  }
-  .score {
-    font-family: var(--mono); font-size: 12.5px; font-weight: 600;
-    flex: none; width: 30px; text-align: center; padding-top: 1px;
-    direction: ltr;
-  }
-  .band {
-    flex: none; font-size: 11px; padding: 2px 7px; border-radius: 20px;
-    border: 1px solid var(--border-strong); color: var(--text-soft);
-    direction: ltr;
-  }
-  .band.ACT { border-color: var(--ok); color: var(--ok); }
-  .band.WATCH { border-color: var(--accent); color: var(--accent); }
-  .opp-body { flex: 1; min-width: 0; }
-  .opp-body .t { font-size: 13.5px; }
-  .opp-body .m {
-    font-size: 12px; color: var(--text-faint); margin-top: 2px;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .srcs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
-  .src {
-    display: inline-flex; align-items: center; gap: 5px;
-    font-size: 11px; text-decoration: none;
-    color: var(--text-soft); background: var(--raised);
-    border: 1px solid var(--border); border-radius: 20px;
-    padding: 2px 9px; max-width: 100%;
-  }
-  .src:hover { border-color: var(--accent); color: var(--accent); }
-  .src .w {
-    font-family: var(--mono); font-size: 10px; direction: ltr;
-    color: var(--text-faint);
-  }
-  /* لون الوزن يقول جودة المصدر قبل قراءة الرقم */
-  .src.hi { border-color: var(--ok); }
-  .src.hi .w { color: var(--ok); }
-  .src.lo .w { color: var(--warn); }
+/* الهالات المنجرفة */
+body::after {
+  background:
+    radial-gradient(38rem 30rem at 18% 12%,
+      color-mix(in oklch, var(--foreground) 7%, transparent), transparent 70%),
+    radial-gradient(32rem 26rem at 82% 8%,
+      color-mix(in oklch, var(--foreground) 5%, transparent), transparent 70%),
+    radial-gradient(42rem 34rem at 55% 88%,
+      color-mix(in oklch, var(--foreground) 6%, transparent), transparent 72%);
+  animation: drift 34s ease-in-out infinite alternate;
+  will-change: transform;
+}
 
-  /* ---------- الخدمات ---------- */
-  .svc-card {
-    border: 1px solid var(--border); border-radius: var(--radius-sm);
-    background: var(--surface); margin-bottom: 9px; overflow: hidden;
-  }
-  .svc-top {
-    display: flex; align-items: center; gap: 11px; padding: 11px 14px;
-  }
-  .svc-top .n { font-size: 14px; font-weight: 600; }
-  .svc-top .d { font-size: 12.5px; color: var(--text-faint); margin-top: 2px; }
-  .svc-top .body { flex: 1; min-width: 0; }
-  .kind {
-    flex: none; font-size: 10.5px; padding: 2px 7px; border-radius: 20px;
-    border: 1px solid var(--border-strong); color: var(--text-faint);
-  }
-  .kind.slow { border-color: var(--warn); color: var(--warn); }
+@keyframes drift {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(-2.5%, 1.8%, 0) scale(1.06); }
+  100% { transform: translate3d(2%, -2.2%, 0) scale(1.03); }
+}
 
-  .svc-in {
-    display: none; gap: 8px; padding: 0 14px 12px;
-  }
-  .svc-in.on { display: flex; }
-  .svc-in input {
-    flex: 1; min-width: 0; font: inherit; font-size: 13.5px;
-    background: var(--raised); color: var(--text);
-    border: 1px solid var(--border); border-radius: var(--radius-sm);
-    padding: 7px 11px;
-  }
-  .svc-in input:focus { outline: none; border-color: var(--accent); }
+:root[data-theme="dark"] body::before { opacity: .35; }
+:root[data-theme="dark"] body::after {
+  background:
+    radial-gradient(38rem 30rem at 18% 12%,
+      color-mix(in oklch, var(--foreground) 9%, transparent), transparent 70%),
+    radial-gradient(32rem 26rem at 82% 8%,
+      color-mix(in oklch, var(--foreground) 6%, transparent), transparent 70%),
+    radial-gradient(42rem 34rem at 55% 88%,
+      color-mix(in oklch, var(--foreground) 7%, transparent), transparent 72%);
+}
 
-  pre.out {
-    display: none; margin: 0; padding: 13px 15px;
-    border-top: 1px solid var(--border); background: var(--bg);
-    font-family: var(--mono); font-size: 12px; line-height: 1.65;
-    white-space: pre-wrap; word-break: break-word;
-    max-height: 460px; overflow: auto;
-    direction: rtl; text-align: start;
-  }
-  pre.out.on { display: block; }
-  pre.out.err { color: #c0392b; }
+@media (prefers-reduced-motion: reduce) {
+  body::after { animation: none; }
+}
 
-  footer {
-    text-align: center; padding: 20px;
-    font-size: 12px; color: var(--text-faint);
-    border-top: 1px solid var(--border);
-  }
+/* ---------- الأيقونات (Lucide) ----------
+   24×24 · stroke 2 · أطراف دائرية - مواصفة lucide الأصلية */
+.i {
+  width: 1rem; height: 1rem; flex: none;
+  stroke: currentColor; fill: none;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+.i-sm { width: .875rem; height: .875rem; }
+.i-lg { width: 1.125rem; height: 1.125rem; }
+.spin { animation: spin .8s linear infinite; }
+
+/* ---------- الرموز المشتركة ---------- */
+.muted { color: var(--muted-foreground); }
+.mono {
+  font-family: var(--mono); direction: ltr; unicode-bidi: embed;
+  font-size: .8125rem;
+}
+.sep { height: 1px; background: var(--border); border: 0; flex-shrink: 0; }
+
+/* ---------- Button ----------
+   inline-flex · gap-2 · rounded-md · text-sm font-medium · h-9 px-4 */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  white-space: nowrap; border-radius: calc(var(--radius) - 2px);
+  font: inherit; font-size: .875rem; font-weight: 500; line-height: 1;
+  height: 2.25rem; padding-inline: 1rem;
+  border: 1px solid transparent; background: transparent; color: inherit;
+  cursor: pointer; text-decoration: none;
+  transition: background-color .15s, color .15s, border-color .15s, opacity .15s;
+}
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 45%, transparent);
+}
+.btn:disabled { pointer-events: none; opacity: .5; }
+
+.btn-default {
+  background: var(--primary); color: var(--primary-foreground);
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / .05);
+}
+.btn-default:hover { background: color-mix(in oklch, var(--primary) 90%, transparent); }
+
+.btn-outline {
+  border-color: var(--input); background: var(--background);
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / .05);
+}
+.btn-outline:hover { background: var(--accent); color: var(--accent-foreground); }
+
+.btn-ghost:hover { background: var(--accent); color: var(--accent-foreground); }
+
+.btn-sm { height: 2rem; padding-inline: .75rem; font-size: .8125rem; }
+.btn-icon { width: 2.25rem; height: 2.25rem; padding: 0; }
+
+/* ---------- Badge ----------
+   rounded-md · border · px-2.5 py-0.5 · text-xs font-semibold */
+.badge {
+  display: inline-flex; align-items: center; gap: .375rem;
+  border: 1px solid transparent; border-radius: calc(var(--radius) - 2px);
+  padding: .125rem .625rem; font-size: .75rem; font-weight: 600;
+  line-height: 1.4; white-space: nowrap;
+}
+.badge-secondary { background: var(--secondary); color: var(--secondary-foreground); }
+.badge-outline { border-color: var(--border); color: var(--foreground); }
+.badge-success { border-color: var(--success); color: var(--success); }
+.badge-warning { border-color: var(--warning); color: var(--warning); }
+.badge-destructive { border-color: var(--destructive); color: var(--destructive); }
+
+/* ---------- Card ----------
+   rounded-xl · border · bg-card · shadow-sm */
+.card {
+  background: var(--card); color: var(--card-foreground);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: 0 1px 2px -1px rgb(0 0 0 / .08), 0 1px 3px 0 rgb(0 0 0 / .05);
+}
+.card-header { padding: 1.25rem 1.5rem; display: grid; gap: .375rem; }
+.card-title { font-size: 1rem; font-weight: 600; letter-spacing: -.01em; line-height: 1.4; }
+.card-desc { font-size: .8125rem; color: var(--muted-foreground); }
+.card-content { padding: 0 1.5rem 1.25rem; }
+.card-footer {
+  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+  padding: 0 1.5rem 1.25rem;
+}
+.card-header + .card-content { padding-top: 0; }
+
+/* ---------- Input / Textarea ----------
+   h-9 · rounded-md · border-input · bg-transparent · px-3 · shadow-sm */
+.input, .textarea {
+  width: 100%; font: inherit; font-size: .875rem;
+  color: var(--foreground); background: transparent;
+  border: 1px solid var(--input); border-radius: calc(var(--radius) - 2px);
+  padding: .5rem .75rem;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / .05);
+  transition: border-color .15s, box-shadow .15s;
+}
+.input { height: 2.25rem; }
+.textarea { resize: none; line-height: 1.6; max-height: 11rem; }
+.input::placeholder, .textarea::placeholder { color: var(--muted-foreground); }
+.input:focus-visible, .textarea:focus-visible {
+  outline: none; border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 35%, transparent);
+}
+
+/* ---------- Tabs ----------
+   list: h-9 rounded-lg bg-muted p-1 · trigger[active]: bg-background shadow */
+.tabs-list {
+  display: inline-flex; align-items: center; gap: .125rem;
+  background: var(--muted); border-radius: var(--radius); padding: .25rem;
+}
+.tabs-trigger {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  white-space: nowrap; border: 0; background: transparent; cursor: pointer;
+  font: inherit; font-size: .875rem; font-weight: 500;
+  color: var(--muted-foreground);
+  padding: .3125rem .875rem; border-radius: calc(var(--radius) - 3px);
+  transition: background-color .15s, color .15s, box-shadow .15s;
+}
+.tabs-trigger:hover { color: var(--foreground); }
+.tabs-trigger[data-state="active"] {
+  background: var(--background); color: var(--foreground);
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / .1), 0 1px 2px -1px rgb(0 0 0 / .1);
+}
+.tabs-trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 45%, transparent);
+}
+.tab-panel { display: none; }
+.tab-panel[data-state="active"] { display: block; }
+
+/* ---------- Alert ---------- */
+.alert {
+  display: flex; align-items: flex-start; gap: .625rem;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: .875rem 1rem; font-size: .875rem; margin-top: 1rem;
+  background: var(--card);
+}
+.alert > .i { margin-top: .25rem; }
+.alert-destructive {
+  border-color: color-mix(in oklch, var(--destructive) 50%, transparent);
+  color: var(--destructive);
+}
+.alert code {
+  font-family: var(--mono); font-size: .8125rem; direction: ltr;
+  display: inline-block; background: var(--muted);
+  padding: .0625rem .375rem; border-radius: .25rem;
+}
+
+/* ---------- Table ---------- */
+.table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+.table th {
+  text-align: start; font-weight: 500; color: var(--muted-foreground);
+  padding: .5rem; height: 2.5rem; font-size: .8125rem;
+  border-bottom: 1px solid var(--border);
+}
+.table td { padding: .625rem .5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+.table tr:last-child td { border-bottom: 0; }
+
+/* ---------- Skeleton ---------- */
+.skeleton {
+  background: color-mix(in oklch, var(--foreground) 10%, transparent);
+  border-radius: calc(var(--radius) - 2px);
+  animation: pulse 2s cubic-bezier(.4,0,.6,1) infinite;
+  height: 1rem;
+}
+@keyframes pulse { 50% { opacity: .5; } }
+
+/* ============================================================
+   تخطيط التطبيق
+   ============================================================ */
+header {
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in oklch, var(--background) 72%, transparent);
+  backdrop-filter: blur(12px) saturate(1.2);
+  position: sticky; top: 0; z-index: 30;
+}
+.head-inner {
+  max-width: 60rem; margin: 0 auto; padding: .75rem 1.5rem;
+  display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
+}
+.logo {
+  width: 1.75rem; height: 1.75rem; flex: none; border-radius: .5rem;
+  background: var(--primary); color: var(--primary-foreground);
+  display: grid; place-items: center; font-size: .75rem; font-weight: 700;
+}
+.brand { font-weight: 600; font-size: .9375rem; letter-spacing: -.01em; }
+.head-right { margin-inline-start: auto; display: flex; align-items: center; gap: .5rem; }
+
+.tabs-bar {
+  max-width: 60rem; margin: 0 auto; padding: 0 1.5rem;
+  display: flex; justify-content: center;
+  margin-top: -.5rem;
+}
+
+main {
+  flex: 1; width: 100%; max-width: 60rem; margin: 0 auto;
+  padding: 1.5rem 1.5rem 5rem;
+}
+
+.hero { padding: 3.5rem 0 2rem; text-align: center; }
+.hero h1 {
+  font-size: 1.875rem; font-weight: 600; letter-spacing: -.025em;
+  line-height: 1.3; margin-bottom: .625rem;
+}
+.hero p { color: var(--muted-foreground); font-size: .9375rem; }
+
+/* صندوق الإدخال */
+.composer {
+  display: flex; align-items: flex-end; gap: .5rem;
+  background: var(--card); border: 1px solid var(--input);
+  border-radius: var(--radius); padding: .375rem;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / .05);
+  transition: border-color .15s, box-shadow .15s;
+}
+.composer:focus-within {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 35%, transparent);
+}
+.composer .textarea {
+  border: 0; box-shadow: none; background: transparent; padding: .5rem .625rem;
+}
+.composer .textarea:focus-visible { box-shadow: none; }
+
+.picker { display: flex; gap: .375rem; flex-wrap: wrap; justify-content: center; margin-bottom: .75rem; }
+.mchip {
+  display: inline-flex; align-items: center; gap: .375rem;
+  border: 1px solid var(--border); background: var(--card);
+  color: var(--muted-foreground); font-size: .8125rem;
+  padding: .25rem .75rem; border-radius: 9999px; cursor: pointer;
+  transition: border-color .15s, color .15s, background-color .15s;
+}
+.mchip:hover { border-color: var(--primary); }
+.mchip.on {
+  background: var(--primary); color: var(--primary-foreground);
+  border-color: var(--primary); font-weight: 600;
+}
+.mchip.on .tag { background: color-mix(in oklch, var(--primary-foreground) 20%, transparent);
+  color: var(--primary-foreground); }
+.mchip .tag {
+  font-size: .6875rem; padding: 0 .375rem; border-radius: 9999px;
+  background: var(--muted); color: var(--muted-foreground);
+}
+
+.hint {
+  margin-top: .75rem; display: flex; gap: .5rem;
+  flex-wrap: wrap; justify-content: center;
+}
+.chip {
+  background: var(--secondary); color: var(--secondary-foreground);
+  border: 1px solid transparent; font-size: .8125rem;
+  padding: .1875rem .75rem; border-radius: 9999px; cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.chip:hover { border-color: var(--primary); color: var(--primary); }
+
+/* التقدّم */
+.run { margin-top: 2rem; display: none; }
+.run.on { display: block; }
+.run-head {
+  display: flex; align-items: baseline; gap: .625rem;
+  padding-bottom: .875rem; border-bottom: 1px solid var(--border);
+}
+.run-topic { font-weight: 600; font-size: 1rem; flex: 1; }
+
+.track {
+  height: 3px; background: var(--muted); border-radius: 9999px;
+  overflow: hidden; margin-top: .5rem;
+}
+.track > i {
+  display: block; height: 100%; width: 0;
+  background: var(--primary); transition: width .5s ease;
+}
+
+ol.stages { list-style: none; margin-top: 1.25rem; }
+ol.stages li {
+  display: flex; align-items: flex-start; gap: .75rem;
+  padding: .5rem 0; color: var(--muted-foreground); transition: color .2s;
+}
+ol.stages li .dot {
+  flex: none; width: 1rem; height: 1rem; margin-top: .3125rem;
+  border-radius: 50%; border: 1.5px solid var(--border);
+  display: grid; place-items: center; transition: all .2s;
+}
+ol.stages li .body { flex: 1; min-width: 0; }
+ol.stages li .label { font-size: .875rem; }
+ol.stages li .note { font-size: .8125rem; color: var(--muted-foreground); }
+li.active { color: var(--foreground); }
+li.active .label { font-weight: 600; }
+li.active .dot {
+  border-color: var(--primary); border-top-color: transparent;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+li.done { color: var(--muted-foreground); }
+li.done .dot { border-color: var(--success); background: var(--success); }
+li.done .dot::after {
+  content: ""; width: 4px; height: 7px;
+  border: solid var(--background); border-width: 0 0 1.5px 1.5px;
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+
+/* النتيجة */
+.result { margin-top: 1.75rem; display: none; }
+.result.on { display: block; }
+.tick { color: var(--success); display: flex; }
+.tick .i { width: 1.125rem; height: 1.125rem; }
+.card-title-row { display: flex; align-items: center; gap: .5rem; }
+
+/* ---------- اللوحات ---------- */
+.section-title {
+  display: flex; align-items: center; gap: .4375rem;
+  font-size: .8125rem; font-weight: 600; color: var(--muted-foreground);
+  margin: 1.75rem 0 .75rem; letter-spacing: .01em;
+}
+.section-title:first-child { margin-top: 0; }
+.empty { color: var(--muted-foreground); font-size: .875rem; padding: .25rem 0; }
+
+.grid2 { display: grid; gap: .625rem; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); }
+.stat { padding: .875rem 1rem; }
+.stat .cap-icon { color: var(--muted-foreground); margin-bottom: .375rem; }
+.stat .big { font-size: 1.375rem; font-weight: 600; letter-spacing: -.02em; }
+.stat .cap { font-size: .8125rem; color: var(--muted-foreground); margin-top: .125rem; }
+
+ul.opps { list-style: none; display: grid; gap: .5rem; }
+ul.opps li { display: flex; align-items: flex-start; gap: .75rem; padding: .75rem 1rem; }
+.score {
+  font-family: var(--mono); font-size: .8125rem; font-weight: 600;
+  flex: none; width: 1.875rem; text-align: center; direction: ltr; padding-top: .125rem;
+}
+.opp-body { flex: 1; min-width: 0; }
+.opp-body .t { font-size: .875rem; color: var(--foreground); text-decoration: none; }
+a.t:hover { color: var(--primary); text-decoration: underline; }
+.opp-body .m {
+  font-size: .8125rem; color: var(--muted-foreground); margin-top: .125rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.srcs { display: flex; gap: .375rem; flex-wrap: wrap; margin-top: .5rem; }
+.src {
+  display: inline-flex; align-items: center; gap: .375rem;
+  font-size: .6875rem; text-decoration: none;
+  color: var(--muted-foreground); background: var(--muted);
+  border: 1px solid transparent; border-radius: 9999px;
+  padding: .0625rem .5rem; max-width: 100%;
+}
+.src:hover { border-color: var(--primary); color: var(--primary); }
+.src .w { font-family: var(--mono); font-size: .625rem; direction: ltr; }
+.src.hi { border-color: color-mix(in oklch, var(--success) 55%, transparent); }
+.src.hi .w { color: var(--success); }
+.src.lo .w { color: var(--warning); }
+
+/* ---------- الخدمات ---------- */
+.svc-card { margin-bottom: .625rem; }
+.svc-top { display: flex; align-items: center; gap: .75rem; padding: .875rem 1rem; }
+.svc-top .body { flex: 1; min-width: 0; }
+.svc-top .n { font-size: .875rem; font-weight: 600; }
+.svc-top .d { font-size: .8125rem; color: var(--muted-foreground); }
+.svc-in { display: none; gap: .5rem; padding: 0 1rem .875rem; }
+.svc-in.on { display: flex; }
+pre.out {
+  display: none; margin: 0; padding: .875rem 1rem;
+  border-top: 1px solid var(--border); background: var(--muted);
+  border-radius: 0 0 calc(var(--radius) - 1px) calc(var(--radius) - 1px);
+  font-family: var(--mono); font-size: .75rem; line-height: 1.7;
+  white-space: pre-wrap; word-break: break-word;
+  max-height: 30rem; overflow: auto; direction: rtl; text-align: start;
+}
+pre.out.on { display: block; }
+pre.out.err { color: var(--destructive); }
+
+footer {
+  border-top: 1px solid var(--border);
+  padding: 1.25rem; text-align: center;
+  font-size: .75rem; color: var(--muted-foreground);
+}
+
+@media (max-width: 640px) {
+  .head-inner { padding: .625rem 1rem; }
+  main { padding: 1rem 1rem 4rem; }
+  .hero { padding: 2rem 0 1.5rem; }
+  .hero h1 { font-size: 1.5rem; }
+  .brand { display: none; }
+}
 </style>
 </head>
 <body>
@@ -427,63 +560,150 @@
     <div class="logo">◆</div>
     <div class="brand">وكيل الأفكار الاستراتيجية</div>
     <div class="head-right">
-      <div class="model" id="model">—</div>
-      <button class="navbtn" id="dashBtn">لوحة المعلومات</button>
-      <button class="navbtn" id="svcBtn">الخدمات</button>
+      <span class="badge badge-secondary mono" id="model">—</span>
+      <button class="btn btn-ghost btn-icon" id="themeBtn" title="تبديل السمة"
+              aria-label="تبديل السمة"></button>
+    </div>
+  </div>
+  <div class="tabs-bar">
+    <div class="tabs-list" role="tablist">
+      <button class="tabs-trigger" role="tab" data-tab="runTab" data-state="active"
+              data-icon="sparkles">تشغيل</button>
+      <button class="tabs-trigger" role="tab" data-tab="dash"
+              data-icon="radar">لوحة المعلومات</button>
+      <button class="tabs-trigger" role="tab" data-tab="svc"
+              data-icon="blocks">الخدمات</button>
     </div>
   </div>
 </header>
 
 <main>
-  <section class="hero" id="hero">
-    <h1>ما الموضوع الذي نشتغل عليه؟</h1>
-    <p>سبعة وكلاء يبحثون وينقدون ويستخرجون حلولاً تنفّذها بنفسك</p>
+
+  <!-- ═══ تشغيل ═══ -->
+  <section class="tab-panel" id="runTab" data-state="active">
+    <div class="hero" id="hero">
+      <h1>ما الموضوع الذي نشتغل عليه؟</h1>
+      <p>سبعة وكلاء يبحثون وينقدون ويستخرجون حلولاً تنفّذها بنفسك</p>
+    </div>
+
+    <div class="picker" id="picker"></div>
+
+    <div class="composer">
+      <textarea class="textarea" id="topic" rows="1"
+                placeholder="اكتب موضوعاً أو فكرة…"></textarea>
+      <button class="btn btn-default btn-icon" id="go" title="ابدأ"
+              data-icon="arrow-left"></button>
+    </div>
+    <div class="hint" id="chips"></div>
+
+    <div id="err"></div>
+
+    <section class="run" id="run">
+      <div class="run-head">
+        <div class="run-topic" id="runTopic"></div>
+        <div class="mono muted" id="runTime">00:00</div>
+      </div>
+      <div class="track"><i id="bar"></i></div>
+      <ol class="stages" id="stages"></ol>
+    </section>
+
+    <section class="result" id="result">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title-row">
+            <span class="tick" data-icon="circle-check"></span>
+            <span class="card-title">اكتمل التقرير</span>
+          </div>
+        </div>
+        <div class="card-content"><table class="table"><tbody id="facts"></tbody></table></div>
+        <div class="card-footer" id="actions"></div>
+      </div>
+      <div class="alert" data-icon="info">
+        المصادر محذوفة من نص التقرير ومحفوظة في قاعدة المعرفة —
+        استرجعها بـ <code>python memory.py sources</code>
+      </div>
+    </section>
   </section>
 
-  <div class="picker" id="picker"></div>
+  <!-- ═══ لوحة المعلومات ═══ -->
+  <section class="tab-panel" id="dash"></section>
 
-  <div class="composer">
-    <textarea id="topic" rows="1" placeholder="اكتب موضوعاً أو فكرة…"></textarea>
-    <button class="send" id="go" title="ابدأ">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
-           stroke-linecap="round" stroke-linejoin="round">
-        <path d="M19 12H5M12 5l-7 7 7 7"/>
-      </svg>
-    </button>
-  </div>
-  <div class="hint" id="chips"></div>
+  <!-- ═══ الخدمات ═══ -->
+  <section class="tab-panel" id="svc"></section>
 
-  <div id="err"></div>
-
-  <section class="run" id="run">
-    <div class="run-head">
-      <div class="run-topic" id="runTopic"></div>
-      <div class="run-time" id="runTime">00:00</div>
-    </div>
-    <div class="track"><i id="bar"></i></div>
-    <ol class="stages" id="stages"></ol>
-  </section>
-
-  <section class="result" id="result">
-    <div class="card">
-      <div class="card-head"><span class="tick"></span><b>اكتمل التقرير</b></div>
-      <dl class="facts" id="facts"></dl>
-      <div class="actions" id="actions"></div>
-    </div>
-    <div class="note-box">
-      المصادر محذوفة من نص التقرير ومحفوظة في قاعدة المعرفة —
-      استرجعها بـ <code>python memory.py sources</code>
-    </div>
-  </section>
-
-  <section class="dash" id="dash"></section>
-  <section class="dash" id="svc"></section>
 </main>
 
 <footer>يعمل محلياً على جهازك · لا يُرفع شيء إلى أي خادم عدا مزوّد النموذج</footer>
 
 <script>
 const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g,
+  c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* الصفحة تعمل عبر الخادم وحده: فتحها كملف يجعل أصلها file:// فتفشل كل
+   نداءات /api/ برسالة «Failed to parse URL» لا تدلّ على السبب. */
+const FILE_MODE = location.protocol === "file:";
+const FILE_MSG = `<div class="alert alert-destructive">هذه الصفحة تعمل عبر خادم
+  البرنامج لا كملف. أغلق هذا التبويب وشغّل <code>python app.py</code> ثم افتح
+  <code>http://127.0.0.1:8730</code></div>`;
+
+
+/* ---------- أيقونات Lucide ----------
+   المسارات منقولة حرفياً من lucide-icons/lucide (MIT). محقونة لا مُحمَّلة:
+   البرنامج يعمل بلا إنترنت، وأيقونة تعتمد على CDN تختفي حين ينقطع. */
+const ICONS = {
+  "sparkles": '<path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/>',
+  "radar": '<path d="M19.07 4.93A10 10 0 0 0 6.99 3.34"/><path d="M4 6h.01"/><path d="M2.29 9.62A10 10 0 1 0 21.31 8.35"/><path d="M16.24 7.76A6 6 0 1 0 8.23 16.67"/><path d="M12 18h.01"/><path d="M17.99 11.66A6 6 0 0 1 15.77 16.67"/><circle cx="12" cy="12" r="2"/><path d="m13.41 10.59 5.66-5.66"/>',
+  "blocks": '<path d="M10 22V7a1 1 0 0 0-1-1H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5a1 1 0 0 0-1-1H2"/><rect x="14" y="2" width="8" height="8" rx="1"/>',
+  "arrow-left": '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+  "circle-check": '<circle cx="12" cy="12" r="10"/><path d="m16 9-5.5 5.5L8 12"/>',
+  "triangle-alert": '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  "info": '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  "swords": '<path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/>',
+  "target": '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  "database": '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',
+  "link": '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  "zap": '<path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/>',
+  "clock": '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  "external-link": '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  "loader-circle": '<path d="M21 12a9 9 0 1 1-6.219-8.56"/>',
+  "sun": '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+  "moon": '<path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/>',
+  "building-2": '<path d="M10 12h4"/><path d="M10 8h4"/><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2"/><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/>',
+  "play": '<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/>',
+};
+
+function icon(name, cls = "") {
+  const d = ICONS[name];
+  if (!d) return "";
+  return `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+}
+
+/* يملأ كل عنصر يحمل data-icon. الأيقونة تسبق النصّ دائماً. */
+function paintIcons(root = document) {
+  root.querySelectorAll("[data-icon]").forEach(el => {
+    if (el.dataset.painted) return;
+    el.dataset.painted = "1";
+    el.insertAdjacentHTML("afterbegin", icon(el.dataset.icon));
+  });
+}
+
+/* ---------- السمة ----------
+   لا نتبع تفضيل النظام صامتين: المستخدم طلب الفاتح صراحةً، والاختيار
+   يُحفظ محلياً فلا يعود الداكن مع كل فتح. */
+const THEME_KEY = "agent-theme";
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem(THEME_KEY, t); } catch (e) {}
+  const b = $("themeBtn");
+  if (b) b.innerHTML = icon(t === "dark" ? "sun" : "moon");
+}
+(function initTheme() {
+  let t = "light";
+  try { t = localStorage.getItem(THEME_KEY) || "light"; } catch (e) {}
+  document.documentElement.dataset.theme = t;
+})();
+
 const SUGGESTIONS = [
   "تحلية المياه بالطاقة الشمسية",
   "إزالة النترات من مياه الشرب",
@@ -497,26 +717,52 @@ function fmt(s) {
   return String(m).padStart(2, "0") + ":" + String(r).padStart(2, "0");
 }
 
+/* ---------- التبويبات ----------
+   كانت اللوحتان تُلحقان أسفل صندوق الإدخال وتُفتحان بزرّين في الترويسة،
+   فيصير المؤلّف والرادار والخدمات في عمود واحد بطول ثلاث شاشات. */
+const loaders = {};
+function showTab(id) {
+  document.querySelectorAll(".tab-panel").forEach(p =>
+    p.dataset.state = p.id === id ? "active" : "inactive");
+  document.querySelectorAll(".tabs-trigger").forEach(t =>
+    t.dataset.state = t.dataset.tab === id ? "active" : "inactive");
+  const load = loaders[id];
+  if (load && !load.done) {
+    load.done = true;
+    const el = $(id);
+    if (FILE_MODE) { el.innerHTML = FILE_MSG; return; }
+    el.innerHTML = `<div class="card" style="padding:1rem;display:grid;gap:.5rem">
+      <div class="skeleton" style="width:40%"></div>
+      <div class="skeleton"></div><div class="skeleton" style="width:70%"></div></div>`;
+    load.fn().catch(e => {
+      load.done = false;
+      el.innerHTML = `<div class="alert alert-destructive">تعذّر التحميل: ${esc(e.message)}</div>`;
+    });
+  }
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+document.querySelectorAll(".tabs-trigger").forEach(t =>
+  t.onclick = () => showTab(t.dataset.tab));
+
+/* ---------- التشغيل ---------- */
 function renderStages(activeIdx, notes) {
   $("stages").innerHTML = stages.map((s, i) => {
     const cls = i < activeIdx ? "done" : i === activeIdx ? "active" : "";
-    const note = notes[i] ? `<div class="note">${notes[i]}</div>` : "";
-    const t = s.seconds ? `<div class="t">${s.seconds}s</div>` : "";
+    const note = notes[i] ? `<div class="note">${esc(notes[i])}</div>` : "";
+    const t = s.seconds ? `<span class="mono muted">${s.seconds}s</span>` : "";
     return `<li class="${cls}">
       <span class="dot"></span>
-      <span class="body"><div class="label">${s.label}</div>${note}</span>
+      <span class="body"><div class="label">${esc(s.label)}</div>${note}</span>
       ${t}
     </li>`;
   }).join("");
-  const pct = Math.round((activeIdx / stages.length) * 100);
-  $("bar").style.width = pct + "%";
+  $("bar").style.width = Math.round((activeIdx / stages.length) * 100) + "%";
 }
 
 let chosenModel = null;
 
 function renderPicker(info) {
   // النموذج السحابي أولاً: على عتاد بلا تسريع رسومي، المحلي أبطأ 10-20×.
-  // نعرض التقدير على الشريحة نفسها بدل إخفائه في التوثيق.
   const opts = [
     { id: info.model, label: info.model.split("/").pop(), tag: info.is_local ? "محلي" : "سحابي" },
     ...(info.local_models || [])
@@ -525,16 +771,15 @@ function renderPicker(info) {
   ];
   chosenModel = info.model;
   $("picker").innerHTML = opts.map(o =>
-    `<span class="mchip${o.id === chosenModel ? " on" : ""}" data-id="${o.id}">
-       ${o.label}<span class="tag">${o.tag}</span></span>`).join("");
+    `<span class="mchip${o.id === chosenModel ? " on" : ""}" data-id="${esc(o.id)}">
+       ${esc(o.label)}<span class="tag">${esc(o.tag)}</span></span>`).join("");
   document.querySelectorAll(".mchip").forEach(c => {
     c.onclick = () => {
       chosenModel = c.dataset.id;
       document.querySelectorAll(".mchip").forEach(x => x.classList.remove("on"));
       c.classList.add("on");
       $("model").textContent = chosenModel;
-      const local = chosenModel.startsWith("ollama/");
-      $("err").innerHTML = local
+      $("err").innerHTML = chosenModel.startsWith("ollama/")
         ? `<div class="alert">النموذج المحلي يعمل بلا إنترنت وبلا تكلفة،
            لكنه على هذا العتاد أبطأ 10-20 ضعفاً — احسب ساعة لا أربع دقائق.</div>`
         : "";
@@ -553,11 +798,11 @@ async function boot() {
   renderPicker(r);
   stages = r.stages.map(s => ({ label: s[0], hint: s[1], seconds: 0 }));
   $("chips").innerHTML = SUGGESTIONS
-    .map(s => `<span class="chip">${s}</span>`).join("");
+    .map(s => `<span class="chip">${esc(s)}</span>`).join("");
   document.querySelectorAll(".chip").forEach(c =>
-    c.onclick = () => { $("topic").value = c.textContent; $("topic").focus(); });
+    c.onclick = () => { $("topic").value = c.textContent.trim(); $("topic").focus(); });
   if (r.key_error) {
-    $("err").innerHTML = `<div class="alert bad">${r.key_error}</div>`;
+    $("err").innerHTML = `<div class="alert alert-destructive">${icon("triangle-alert")}${esc(r.key_error)}</div>`;
     $("go").disabled = true;
     return;
   }
@@ -565,9 +810,10 @@ async function boot() {
   const st = await fetch("/api/status").then(x => x.json());
   if (st.active) {
     $("err").innerHTML =
-      `<div class="alert">تشغيلة جارية: <b>${st.topic}</b> — المرحلة ${st.stage}/8،
+      `<div class="alert">تشغيلة جارية: <b>${esc(st.topic)}</b> — المرحلة ${st.stage}/8،
        منذ ${fmt(st.elapsed)}.
-       <button class="btn" id="cancelRun" style="margin-inline-start:10px">إلغاؤها</button></div>`;
+       <button class="btn btn-outline btn-sm" id="cancelRun"
+               style="margin-inline-start:.625rem">إلغاؤها</button></div>`;
     $("cancelRun").onclick = async () => {
       await fetch("/api/cancel", { method: "POST" });
       location.href = location.pathname;
@@ -584,7 +830,7 @@ async function boot() {
 const ta = $("topic");
 ta.addEventListener("input", () => {
   ta.style.height = "auto";
-  ta.style.height = Math.min(ta.scrollHeight, 180) + "px";
+  ta.style.height = Math.min(ta.scrollHeight, 176) + "px";
 });
 ta.addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); start(); }
@@ -595,6 +841,7 @@ async function start() {
   const topic = ta.value.trim();
   if (!topic) return;
 
+  showTab("runTab");
   $("go").disabled = true;
   ta.disabled = true;
   $("hero").style.display = "none";
@@ -638,7 +885,7 @@ async function start() {
       showResult(d);
     } else if (kind === "failed") {
       finish();
-      $("err").innerHTML = `<div class="alert bad">${d.error}</div>`;
+      $("err").innerHTML = `<div class="alert alert-destructive">${icon("triangle-alert")}${esc(d.error)}</div>`;
     }
   };
 
@@ -649,7 +896,7 @@ async function start() {
     if (!res.ok) {
       const e = await res.json().catch(() => ({ error: "HTTP " + res.status }));
       finish();
-      $("err").innerHTML = `<div class="alert bad">${e.error}</div>`;
+      $("err").innerHTML = `<div class="alert alert-destructive">${icon("triangle-alert")}${esc(e.error)}</div>`;
       return;
     }
 
@@ -673,7 +920,7 @@ async function start() {
   } catch (err) {
     finish();
     $("err").innerHTML =
-      `<div class="alert bad">انقطع الاتصال بالخادم: ${err.message}</div>`;
+      `<div class="alert alert-destructive">انقطع الاتصال بالخادم: ${esc(err.message)}</div>`;
   }
 }
 
@@ -690,40 +937,112 @@ function showResult(d) {
     rows.push(["كيانات", String(d.stats.entities)]);
     rows.push(["تعارضات", String(d.stats.conflicts)]);
   }
-  $("facts").innerHTML = rows
-    .map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
+  $("facts").innerHTML = rows.map(([k, v]) =>
+    `<tr><th style="width:9rem">${esc(k)}</th><td>${esc(v)}</td></tr>`).join("");
 
   $("actions").innerHTML =
-    `<a class="btn primary" href="/api/file?p=${encodeURIComponent(d.path)}" target="_blank">فتح التقرير</a>
-     <button class="btn" onclick="location.reload()">موضوع جديد</button>`;
+    `<a class="btn btn-default" href="/api/file?p=${encodeURIComponent(d.path)}"
+        target="_blank">${icon("external-link", "i-sm")}فتح التقرير</a>
+     <button class="btn btn-outline" onclick="location.reload()">موضوع جديد</button>`;
 
   if (d.warnings && d.warnings.length) {
     $("err").innerHTML = d.warnings
-      .map(w => `<div class="alert">${w}</div>`).join("");
+      .map(w => `<div class="alert">${esc(w)}</div>`).join("");
   }
   if (d.timed_out) {
-    $("err").innerHTML += `<div class="alert">انتهت المهلة — التقرير جزئي.</div>`;
+    $("err").innerHTML += `<div class="alert alert-destructive">انتهت المهلة — التقرير جزئي.</div>`;
   }
   $("result").classList.add("on");
 }
 
-/* ---------- الخدمات ----------
-   أربع عشرة وحدة كانت تعمل ولا تُستدعى إلا بأمر طرفية يُحفظ غيباً. */
+/* ---------- لوحة المعلومات ---------- */
+function stat(big, cap, ic) {
+  return `<div class="card stat">
+            <div class="cap-icon">${ic ? icon(ic) : ""}</div>
+            <div class="big">${esc(big)}</div>
+            <div class="cap">${esc(cap)}</div></div>`;
+}
+
+function renderDash(d) {
+  const out = [];
+
+  const opps = d.opportunities || [];
+  out.push(`<div class="section-title">${icon("radar","i-sm")} رادار الفرص</div>`);
+  if (d.schedule && d.schedule.enabled) {
+    const s = d.schedule;
+    const line = s.last_run
+      ? (s.last_ok
+          ? `آخر تحديث قبل ${s.hours_since} ساعة · رصد ${s.last_found} فرصة · التالي بعد ${s.hours_until} ساعة`
+          : `آخر محاولة فشلت: ${s.last_error}`)
+      : `لم يعمل بعد · أول جولة خلال دقائق`;
+    out.push(`<div class="empty" style="margin-bottom:.5rem">تحديث تلقائي كل
+              ${esc(s.every_hours)} ساعة — ${esc(line)}</div>`);
+  }
+  out.push(opps.length ? `<ul class="opps">` + opps.slice(0, 12).map(o => {
+    const meta = [o.company, o.location, o.event_type].filter(Boolean).join(" · ");
+    const title = o.url
+      ? `<a class="t" href="${esc(o.url)}" target="_blank" rel="noopener">${esc(o.title)}</a>`
+      : `<div class="t">${esc(o.title)}</div>`;
+    // المصدر ظاهر لا مخبّأ خلف العنوان: فرصة بلا مصدر تُرى ادّعاءً
+    const srcs = (o.sources || []).map(s => {
+      const w = s.weight == null ? "" : `<span class="w">${s.weight.toFixed(2)}</span>`;
+      const cls = s.weight == null ? "" : s.weight >= 0.75 ? " hi" : s.weight <= 0.40 ? " lo" : "";
+      return `<a class="src${cls}" href="${esc(s.url)}" target="_blank" rel="noopener"
+                title="${esc(s.tier || "")}">${icon("link","i-sm")}${w}${esc(s.site || s.url)}</a>`;
+    }).join("");
+    const band = o.band === "HIGH" || o.band === "INVESTIGATE" ? "badge-success"
+               : o.band === "WATCH" ? "badge-outline" : "badge-secondary";
+    return `<li class="card"><span class="score">${esc(o.score)}</span>
+      <span class="badge ${band}">${esc(o.band)}</span>
+      <span class="opp-body">${title}<div class="m">${esc(meta || o.why || "")}</div>
+      ${srcs ? `<div class="srcs">${srcs}</div>`
+             : `<div class="srcs"><span class="src lo">بلا مصدر موثّق</span></div>`}
+      </span></li>`;
+  }).join("") + "</ul>"
+    : `<div class="empty">لا فرص مرصودة بعد — شغّل «كشف فرص جديدة» من الخدمات</div>`);
+
+  const comps = d.competitors || [];
+  out.push(`<div class="section-title">${icon("swords","i-sm")} رادار المنافسين</div>`);
+  out.push(comps.length ? `<ul class="opps">` + comps.map(c =>
+    `<li class="card"><span class="score">${esc(c.threat)}</span>
+      <span class="opp-body"><div class="t">${esc(c.name)}</div>
+      <div class="m">${esc(c.sector || "")} · ${esc(c.moves)} حركة · ${esc(c.changes)} تغيّر</div>
+      </span></li>`).join("") + "</ul>"
+    : `<div class="empty">لا منافسين مُتابَعون</div>`);
+
+  const a = d.accuracy || {}, k = d.knowledge || {};
+  out.push(`<div class="section-title">${icon("target","i-sm")} الدقّة والمعرفة</div><div class="grid2">`);
+  if (a.resolved) out.push(stat(a.hit_rate + "%",
+    `${a.resolved} تنبؤ محسوم · ${a.calibration || ""}`, "target"));
+  if (k.facts) {
+    const p = Math.round(100 * (k.sourced || 0) / k.facts);
+    out.push(stat(k.facts.toLocaleString("ar"), `حقيقة · ${p}% موثّقة بمصدر`, "database"));
+    out.push(stat(k.entities, "كيان في قاعدة المعرفة", "building-2"));
+  }
+  out.push(stat((d.conflicts || []).length, "تعارض مرصود يحتاج حسماً", "triangle-alert"));
+  out.push(`</div>`);
+
+  $("dash").innerHTML = out.join("");
+}
+
+/* ---------- الخدمات ---------- */
 function renderServices(list) {
   $("svc").innerHTML =
-    `<h2>الخدمات</h2>` +
-    `<div class="empty">السريعة تقرأ من قاعدة المعرفة وترجع فوراً ·
-      البطيئة تستدعي النموذج وتأخذ دقائق</div>` +
+    `<div class="section-title">${icon("blocks","i-sm")} الخدمات</div>` +
+    `<div class="empty" style="margin-bottom:.75rem">السريعة تقرأ من قاعدة
+      المعرفة وترجع فوراً · البطيئة تستدعي النموذج وتأخذ دقائق</div>` +
     list.map(s => `
-      <div class="svc-card" data-id="${esc(s.id)}">
+      <div class="card svc-card" data-id="${esc(s.id)}">
         <div class="svc-top">
-          <span class="kind ${esc(s.kind)}">${s.kind === "slow" ? "بطيئة" : "سريعة"}</span>
+          <span class="badge ${s.kind === "slow" ? "badge-warning" : "badge-secondary"}">
+            ${icon(s.kind === "slow" ? "clock" : "zap", "i-sm")}
+            ${s.kind === "slow" ? "بطيئة" : "سريعة"}</span>
           <span class="body"><div class="n">${esc(s.label)}</div>
             <div class="d">${esc(s.desc)}</div></span>
-          <button class="btn go">شغّل</button>
+          <button class="btn btn-outline btn-sm go">${icon("play","i-sm")}شغّل</button>
         </div>
         <div class="svc-in${s.placeholder ? " on" : ""}">
-          <input type="text" placeholder="${esc(s.placeholder)}">
+          <input class="input" type="text" placeholder="${esc(s.placeholder)}">
         </div>
         <pre class="out"></pre>
       </div>`).join("");
@@ -734,8 +1053,8 @@ function renderServices(list) {
     const inp = card.querySelector(".svc-in input");
     btn.onclick = async () => {
       btn.disabled = true;
-      const label = btn.textContent;
-      btn.textContent = "…";
+      const label = btn.innerHTML;
+      btn.innerHTML = icon("loader-circle", "i-sm spin");
       out.className = "out on";
       out.textContent = "جارٍ التنفيذ…";
       try {
@@ -751,7 +1070,7 @@ function renderServices(list) {
         out.textContent = "تعذّر الاتصال: " + e.message;
       }
       btn.disabled = false;
-      btn.textContent = label;
+      btn.innerHTML = label;
     };
     if (inp) inp.addEventListener("keydown", e => {
       if (e.key === "Enter") { e.preventDefault(); btn.click(); }
@@ -759,117 +1078,22 @@ function renderServices(list) {
   });
 }
 
-/* ---------- لوحة المعلومات ----------
-   كانت تُحسب في dashboard.py وتُقدَّم على /api/dashboard، لكن الواجهة لم
-   تستدعها قط: رادار فرص كامل لا يراه أحد. */
-const esc = s => String(s ?? "").replace(/[&<>"]/g,
-  c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-
-function tile(big, cap) {
-  return `<div class="tile"><div class="big">${esc(big)}</div>
-          <div class="cap">${esc(cap)}</div></div>`;
-}
-
-function renderDash(d) {
-  const out = [];
-
-  const opps = d.opportunities || [];
-  out.push("<h2>رادار الفرص</h2>");
-  if (d.schedule && d.schedule.enabled) {
-    const s = d.schedule;
-    const line = s.last_run
-      ? (s.last_ok
-          ? `آخر تحديث قبل ${s.hours_since} ساعة · رصد ${s.last_found} فرصة ·
-             التالي بعد ${s.hours_until} ساعة`
-          : `آخر محاولة فشلت: ${s.last_error}`)
-      : `لم يعمل بعد · أول جولة خلال دقائق`;
-    out.push(`<div class="empty">تحديث تلقائي كل ${s.every_hours} ساعة —
-              ${esc(line)}</div>`);
-  }
-  out.push(opps.length ? `<ul class="opps">` + opps.slice(0, 10).map(o => {
-    const meta = [o.company, o.location, o.event_type].filter(Boolean).join(" · ");
-    const title = o.url
-      ? `<a class="t" href="${esc(o.url)}" target="_blank" rel="noopener">${esc(o.title)}</a>`
-      : `<div class="t">${esc(o.title)}</div>`;
-    // المصدر ظاهر لا مخبّأ خلف العنوان: فرصة بلا مصدر تُرى ادّعاءً
-    const srcs = (o.sources || []).map(s => {
-      const w = s.weight == null ? "" : `<span class="w">${s.weight.toFixed(2)}</span>`;
-      const cls = s.weight == null ? "" : s.weight >= 0.75 ? " hi" : s.weight <= 0.40 ? " lo" : "";
-      return `<a class="src${cls}" href="${esc(s.url)}" target="_blank" rel="noopener"
-                title="${esc(s.tier || "")}">${w}${esc(s.site || s.url)}</a>`;
-    }).join("");
-    return `<li><span class="score">${esc(o.score)}</span>
-      <span class="band ${esc(o.band)}">${esc(o.band)}</span>
-      <span class="opp-body">${title}<div class="m">${esc(meta || o.why || "")}</div>
-      ${srcs ? `<div class="srcs">${srcs}</div>`
-             : `<div class="srcs"><span class="src lo">بلا مصدر موثّق</span></div>`}
-      </span></li>`;
-  }).join("") + "</ul>"
-    : `<div class="empty">لا فرص مرصودة بعد — شغّل «كشف فرص جديدة» من الخدمات</div>`);
-
-  const comps = d.competitors || [];
-  out.push("<h2>رادار المنافسين</h2>");
-  out.push(comps.length ? `<ul class="opps">` + comps.map(c =>
-    `<li><span class="score">${esc(c.threat)}</span>
-      <span class="opp-body"><div class="t">${esc(c.name)}</div>
-      <div class="m">${esc(c.sector || "")} · ${esc(c.moves)} حركة · ${esc(c.changes)} تغيّر</div>
-      </span></li>`).join("") + "</ul>"
-    : `<div class="empty">لا منافسين مُتابَعون</div>`);
-
-  const a = d.accuracy || {}, k = d.knowledge || {};
-  out.push("<h2>الدقّة والمعرفة</h2><div class=\"grid2\">");
-  if (a.resolved) {
-    out.push(tile(a.hit_rate + "%", `${a.resolved} تنبؤ محسوم · ${a.calibration || ""}`));
-  }
-  if (k.facts) {
-    const p = Math.round(100 * (k.sourced || 0) / k.facts);
-    out.push(tile(k.facts.toLocaleString("ar"), `حقيقة · ${p}% موثّقة بمصدر`));
-    out.push(tile(k.entities, "كيان في قاعدة المعرفة"));
-  }
-  out.push(tile((d.conflicts || []).length, "تعارض مرصود يحتاج حسماً"));
-  out.push("</div>");
-
-  $("dash").innerHTML = out.join("");
-}
-
-/* الصفحة تعمل عبر الخادم وحده: فتحها كملف يجعل أصلها file:// فتفشل كل
-   نداءات /api/ برسالة «Failed to parse URL» لا تدلّ على السبب. */
-const FILE_MODE = location.protocol === "file:";
-const FILE_MSG = `<div class="alert">هذه الصفحة تعمل عبر خادم البرنامج لا كملف.
-  أغلق هذا التبويب وشغّل <code>python app.py</code> ثم افتح
-  <code>http://127.0.0.1:8730</code></div>`;
-
-/* لوحة واحدة مفتوحة في كل مرة: فتحهما معاً يدفع المؤلّف أسفل شاشتين. */
-function panel(btnId, elId, loader) {
-  let loaded = false;
-  $(btnId).onclick = async () => {
-    const el = $(elId), on = !el.classList.contains("on");
-    ["dash", "svc"].forEach(x => $(x).classList.remove("on"));
-    ["dashBtn", "svcBtn"].forEach(x => $(x).classList.remove("on"));
-    if (!on) return;
-    el.classList.add("on");
-    $(btnId).classList.add("on");
-    if (FILE_MODE) { el.innerHTML = FILE_MSG; return; }
-    if (!loaded) {
-      el.innerHTML = `<div class="empty">…جارٍ التحميل</div>`;
-      try { await loader(); loaded = true; }
-      catch (e) { el.innerHTML = `<div class="alert">تعذّر التحميل: ${esc(e.message)}</div>`; }
-    }
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-}
-
-panel("dashBtn", "dash", async () => {
+loaders.dash = { done: false, fn: async () => {
   const [d, s] = await Promise.all([
     fetch("/api/dashboard").then(x => x.json()),
     fetch("/api/schedule").then(x => x.json()).catch(() => null),
   ]);
   d.schedule = s;
   renderDash(d);
-});
-panel("svcBtn", "svc", async () =>
-  renderServices((await fetch("/api/services").then(x => x.json())).services));
+}};
+loaders.svc = { done: false, fn: async () =>
+  renderServices((await fetch("/api/services").then(x => x.json())).services) };
 
+setTheme(document.documentElement.dataset.theme || "light");
+$("themeBtn").onclick = () =>
+  setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+
+paintIcons();
 boot();
 </script>
 </body>
