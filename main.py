@@ -52,7 +52,9 @@ load_dotenv(app_dir() / ".env")
 load_dotenv()          # واحتياطاً: مجلد التشغيل، لمن يضع .env هناك
 
 TODAY = date.today()
-MODEL = os.getenv("MODEL", "openrouter/minimax/minimax-m3:free")
+# فارغ = تلقائي: موجّه المزوّدين يختار حسب نوع المهمة. تحديد نموذج هنا
+# يثبّت الوكلاء السبعة عليه ويُلغي التوجيه.
+MODEL = (os.getenv("MODEL") or "").strip()
 
 
 def _flag(name: str, default: str) -> bool:
@@ -110,6 +112,17 @@ KIND_OF = {"A1": "fast", "A2": "analytic", "A3": "analytic", "A4": "analytic",
            "A5": "analytic", "A6": "analytic", "A7": "analytic",
            "RED": "analytic", "SYN": "broad"}
 
+# توزيع الوكلاء على المزوّدين: لكل وكيل إزاحة ثابتة في سلسلة نوعه، فلا
+# يتكدّس السبعة على مزوّد واحد ويصطفّوا في طابور حصّته المجانية.
+#
+# ثابتة لا عشوائية: التشغيلة تبقى قابلة للتكرار، وإعادة البناء بعد فشل
+# تنتقل للتالي بانتظام بدل القفز عشوائياً.
+#
+# الموجة الأولى (A1-A4) تأخذ إزاحات مختلفة كلها لأنها تعمل معاً، وكذلك
+# الثانية (A5-A7). والمركّب والفريق الأحمر منفردان فتكفيهما الصفر.
+AGENT_SPREAD = {"A1": 0, "A2": 1, "A3": 2, "A4": 3,
+                "A5": 1, "A6": 2, "A7": 3, "RED": 0, "SYN": 0}
+
 _KEY_ENV = {"openrouter/": "OPENROUTER_API_KEY", "gpt-": "OPENAI_API_KEY",
             "openai/": "OPENAI_API_KEY", "anthropic/": "ANTHROPIC_API_KEY"}
 
@@ -129,7 +142,25 @@ def is_local() -> bool:
 
 
 def check_key() -> str | None:
-    """يعيد رسالة خطأ إن كان المفتاح ناقصاً، أو None إن كان سليماً."""
+    """
+    يعيد رسالة خطأ إن تعذّر التشغيل، أو None إن كان جاهزاً.
+
+    بلا MODEL محدَّد نسأل موجّه المزوّدين: هل من مزوّد جاهز أصلاً؟ الفحص
+    القديم كان مكتوباً لعالم النموذج الواحد فيبحث عن مفتاح MODEL، وحين
+    فُرّغ ليعمل التوجيه سقط على OPENAI_API_KEY ومنع التشغيل كلّه رغم
+    وجود مفتاح Gemini صالح.
+    """
+    if not MODEL:
+        try:
+            import providers
+            if ready := providers.available():
+                return None if any(p.name != "ollama" for p in ready)                     or providers.ollama_up() else                     "لا مزوّد جاهز: Ollama هو الوحيد المتاح وخادمه لا يستجيب."
+            return ("لا مفتاح لأي مزوّد في .env — أضف GEMINI_API_KEY أو "
+                    "GROQ_API_KEY أو OPENROUTER_API_KEY. "
+                    "لعرض الحالة: python providers.py")
+        except ImportError:
+            return "تعذّر تحميل موجّه المزوّدين."
+
     if is_local():
         # النماذج المحلية لا تحتاج مفتاحاً، لكنها تحتاج خادم Ollama حيّاً
         import urllib.error
@@ -375,10 +406,13 @@ def build_agents() -> dict:
     # MODEL المضبوط يدوياً يعلو على التوجيه التلقائي
     forced = MODEL if os.getenv("MODEL") else None
 
-    def make(role, goal, backstory, temp, kind, with_tools=False, attempt=0):
+    SPREAD = AGENT_SPREAD
+
+    def make(role, goal, backstory, temp, kind, with_tools=False, attempt=0,
+             spread=0):
         try:
             llm, _p = providers.make_llm(kind, attempt, temperature=temp,
-                                         forced=forced, **opts)
+                                         forced=forced, spread=spread, **opts)
         except IndexError:
             raise
         except Exception:
@@ -388,7 +422,7 @@ def build_agents() -> dict:
                      verbose=False, allow_delegation=False, inject_date=True)
 
     agents = {code: make(role, goal, back, temp, KIND_OF[code],
-                         with_tools=(code == "A1"))
+                         with_tools=(code == "A1"), spread=SPREAD.get(code, 0))
               for code, role, goal, back, temp, _ in pipeline.ROSTER}
 
     agents["RED"] = make(
@@ -413,12 +447,14 @@ def build_agents() -> dict:
             kind = providers.BROAD if code == "SYN" else providers.ANALYTIC
             return lambda n: make(agents[code].role, agents[code].goal,
                                   agents[code].backstory,
-                                  0.45 if code == "SYN" else 0.35, kind, attempt=n)
+                                  0.45 if code == "SYN" else 0.35, kind,
+                                  attempt=n, spread=SPREAD.get(code, 0))
         if not spec:
             return None
         _, role, goal, back, temp, _ = spec
         return lambda n: make(role, goal, back, temp, KIND_OF[code],
-                              with_tools=(code == "A1"), attempt=n)
+                              with_tools=(code == "A1"), attempt=n,
+                              spread=SPREAD.get(code, 0))
 
     agents["_rebuild"] = rebuild
     return agents

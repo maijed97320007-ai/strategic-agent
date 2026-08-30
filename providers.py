@@ -169,11 +169,19 @@ def chain(kind: str, forced: str | None = None) -> list[tuple[Provider, str]]:
 
 
 def make_llm(kind: str, index: int = 0, temperature: float = 0.5,
-             forced: str | None = None, **opts):
+             forced: str | None = None, spread: int = 0, **opts):
     """
     ينشئ LLM للمرشّح رقم `index` في سلسلة النوع.
 
-    يرمي IndexError حين تنفد المرشّحات - إشارة للمتصل بأن التجاوز انتهى.
+    `spread` يزيح نقطة البداية في السلسلة. الغرض توزيع الوكلاء على
+    المزوّدين بدل تكديسهم على الأول: أربعة وكلاء متوازين على مزوّد واحد
+    يصطفّون في طابور حصّته المجانية، فتصير الموجة تسلسلية فعلياً - وهو
+    ما فسّر 66 ثانية للموجة الأولى بينما أبطأ وكيل فيها أقلّ من ذلك.
+
+    التوزيع دوريّ (modulo) لا خطّي: بمزوّدَين وسبعة وكلاء يتناوبان، ولا
+    يبقى وكيل بلا مزوّد.
+
+    يرمي IndexError حين تنفد المحاولات - إشارة للمتصل بأن التجاوز انتهى.
     """
     from crewai import LLM
 
@@ -181,7 +189,19 @@ def make_llm(kind: str, index: int = 0, temperature: float = 0.5,
     if index >= len(cands):
         raise IndexError(f"نفدت المزوّدات لنوع {kind} بعد {len(cands)} محاولة")
 
-    provider, model_id = cands[index]
+    # الإزاحة تدور بين المزوّدين السحابيين وحدهم. Ollama يبقى في السلسلة
+    # للتجاوز عند الفشل لكنه لا يشارك في التوزيع: قياس على هذا العتاد
+    # أعطاه 2-6 رموز/ثانية أي أبطأ 10-20 ضعفاً، ورسب في حاجز المصادر بعد
+    # سبع عشرة دقيقة. وكيلٌ يقع عليه بالقرعة يُبطئ الموجة كلها لأن الموجة
+    # تنتهي بانتهاء أبطأ عضو فيها.
+    if spread:
+        cloud = [i for i, (pr, _) in enumerate(cands) if pr.name != "ollama"]
+        if cloud:
+            provider, model_id = cands[cloud[(index + spread) % len(cloud)]]
+        else:
+            provider, model_id = cands[index]
+    else:
+        provider, model_id = cands[index]
     kw = dict(opts)
     if base := os.getenv("LLM_BASE_URL"):
         kw["base_url"] = base          # وسيط موحّد مثل FreeLLMAPI

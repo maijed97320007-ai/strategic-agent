@@ -80,7 +80,17 @@ def _routing() -> dict:
         for kind in (providers.FAST, providers.ANALYTIC, providers.BROAD):
             chain = providers.chain(kind)
             first[kind] = chain[0][0].name if chain else None
-        return {"ready": ready, "routes": first}
+
+        # التوزيع الفعلي للوكلاء: من يعمل على ماذا في هذه التشغيلة
+        spread = {}
+        for code, kind in core.KIND_OF.items():
+            try:
+                _llm, pr = providers.make_llm(kind, 0,
+                                              spread=core.AGENT_SPREAD.get(code, 0))
+                spread[code] = pr.name
+            except Exception:
+                pass
+        return {"ready": ready, "routes": first, "agents": spread}
     except Exception:
         return {"ready": [], "routes": {}}
 
