@@ -356,10 +356,13 @@ header {
   display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
 }
 .logo {
-  width: 1.75rem; height: 1.75rem; flex: none; border-radius: .5rem;
-  background: var(--primary); color: var(--primary-foreground);
-  display: grid; place-items: center; font-size: .75rem; font-weight: 700;
+  width: 2rem; height: 2rem; flex: none; border-radius: .5rem;
+  background: color-mix(in oklab, var(--primary) 14%, transparent);
+  border: 1px solid color-mix(in oklab, var(--primary) 30%, transparent);
+  color: var(--primary);
+  display: grid; place-items: center;
 }
+.logo svg { width: 1.15rem; height: 1.15rem; }
 .brand { font-weight: 600; font-size: .9375rem; letter-spacing: -.01em; }
 .head-right { margin-inline-start: auto; display: flex; align-items: center; gap: .5rem; }
 
@@ -397,24 +400,6 @@ main {
   border: 0; box-shadow: none; background: transparent; padding: .5rem .625rem;
 }
 .composer .textarea:focus-visible { box-shadow: none; }
-
-/* رقاقات التوجيه: من يعمل ومن يتصدّر */
-.routing {
-  display: flex; gap: .375rem; flex-wrap: wrap;
-  justify-content: center; margin-bottom: .875rem;
-}
-.pill {
-  display: inline-flex; align-items: center; gap: .3125rem;
-  border: 1px solid var(--border); background: var(--card);
-  color: var(--muted-foreground); font-size: .75rem;
-  padding: .1875rem .625rem; border-radius: 9999px;
-}
-.pill.on {
-  border-color: color-mix(in oklab, var(--primary) 45%, transparent);
-  background: color-mix(in oklab, var(--primary) 10%, transparent);
-  color: var(--primary); font-weight: 600;
-}
-.pill.on .i { color: var(--primary); }
 
 .hint {
   margin-top: .75rem; display: flex; gap: .5rem;
@@ -545,6 +530,63 @@ pre.out {
 pre.out.on { display: block; }
 pre.out.err { color: var(--destructive); }
 
+/* ---------- التقرير المعروض ---------- */
+.report {
+  display: none; margin-top: 1.25rem;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.75rem 2rem;
+  line-height: 1.9; font-size: .9375rem;
+}
+.report.on { display: block; }
+.report h1 { font-size: 1.375rem; margin: 0 0 .75rem; letter-spacing: -.02em; }
+.report h2 {
+  font-size: 1.0625rem; margin: 1.75rem 0 .625rem;
+  padding-bottom: .375rem; border-bottom: 1px solid var(--border);
+}
+.report h3 { font-size: .9375rem; margin: 1.25rem 0 .5rem; color: var(--primary); }
+.report p { margin: .625rem 0; }
+.report ul, .report ol { margin: .625rem 0; padding-inline-start: 1.5rem; }
+.report li { margin: .25rem 0; }
+.report strong { font-weight: 600; }
+.report em { color: var(--muted-foreground); font-style: normal; }
+.report hr { border: 0; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+.report blockquote {
+  margin: .75rem 0; padding: .5rem 1rem;
+  border-inline-start: 2px solid var(--primary);
+  color: var(--muted-foreground);
+}
+.report table {
+  width: 100%; border-collapse: collapse; font-size: .875rem; margin: 1rem 0;
+}
+.report th, .report td {
+  padding: .5rem .625rem; border: 1px solid var(--border); text-align: start;
+  vertical-align: top;
+}
+.report th { background: var(--muted); font-weight: 600; }
+/* الجدول العريض يمرّر داخل إطاره لا يمدّ الصفحة */
+.report .tw { overflow-x: auto; }
+.report svg { max-width: 100%; height: auto; }
+.report code {
+  font-family: var(--mono); font-size: .8125rem; direction: ltr;
+  background: var(--muted); padding: .0625rem .375rem; border-radius: .25rem;
+}
+
+/* ---------- المحادثة ---------- */
+.ask-box { display: none; margin-top: 1rem; }
+.ask-box.on { display: block; }
+.qa { margin-top: 1rem; display: grid; gap: .75rem; }
+.qa .q {
+  font-weight: 600; font-size: .875rem;
+  display: flex; gap: .5rem; align-items: flex-start;
+}
+.qa .q::before { content: "؟"; color: var(--primary); font-weight: 700; }
+.qa .a {
+  font-size: .875rem; line-height: 1.85; white-space: pre-wrap;
+  color: var(--card-foreground);
+  border-inline-start: 2px solid var(--border);
+  padding-inline-start: .875rem;
+}
+
 footer {
   border-top: 1px solid var(--border);
   padding: 1.25rem; text-align: center;
@@ -564,7 +606,24 @@ footer {
 
 <header>
   <div class="head-inner">
-    <div class="logo">◆</div>
+    <!-- الشعار: ثلاثة مدخلات تلتقي في مخرَج واحد - وهو ما يفعله البرنامج
+         حرفياً: سبعة وكلاء يتقاطعون في تقرير واحد. محرف الماسة السابق
+         كان رمزاً محايداً لا يقول شيئاً عن الأداة.
+
+         التدفّق من اليمين إلى اليسار: النسخة الأولى رُسمت بالاتجاه
+         اللاتيني فبدت في واجهة عربية كأنّ المُخرَج يتفرّع إلى مدخلات. -->
+    <div class="logo" aria-label="وكيل الأفكار الاستراتيجية">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17.4 6.9 8.7 11"/>
+        <path d="M17.4 17.1 8.7 13"/>
+        <path d="M17.4 12H8.7"/>
+        <circle cx="19.4" cy="6.6"  r="1.6"/>
+        <circle cx="19.4" cy="12"   r="1.6"/>
+        <circle cx="19.4" cy="17.4" r="1.6"/>
+        <circle cx="5.6" cy="12" r="2.9" fill="currentColor" stroke="none"/>
+      </svg>
+    </div>
     <div class="brand">وكيل الأفكار الاستراتيجية</div>
     <div class="head-right">
       <button class="btn btn-ghost btn-icon" id="themeBtn" title="تبديل السمة"
@@ -592,7 +651,6 @@ footer {
       <p>سبعة وكلاء يبحثون وينقدون ويستخرجون حلولاً تنفّذها بنفسك</p>
     </div>
 
-    <div class="routing" id="routing"></div>
 
     <div class="composer">
       <textarea class="textarea" id="topic" rows="1"
@@ -627,6 +685,24 @@ footer {
       <div class="alert" data-icon="info">
         المصادر محذوفة من نص التقرير ومحفوظة في قاعدة المعرفة —
         استرجعها بـ <code>python memory.py sources</code>
+      </div>
+
+      <article class="report" id="report"></article>
+
+      <div class="card ask-box" id="askBox">
+        <div class="card-header">
+          <div class="card-title">اسأل عن هذا التقرير</div>
+          <div class="card-desc">الإجابة من التقرير نفسه، بلا بحث جديد.</div>
+        </div>
+        <div class="card-content">
+          <div class="composer">
+            <textarea class="textarea" id="askInput" rows="1"
+                      placeholder="مثلاً: أيّ فكرة أبدأ بها وما أول خطوة؟"></textarea>
+            <button class="btn btn-default btn-icon" id="askGo"
+                    title="اسأل" data-icon="arrow-left"></button>
+          </div>
+          <div id="askLog"></div>
+        </div>
       </div>
     </section>
   </section>
@@ -766,29 +842,6 @@ function renderStages(activeIdx, notes) {
   $("bar").style.width = Math.round((activeIdx / stages.length) * 100) + "%";
 }
 
-/* ---------- التوجيه ----------
-   لا مبدّل نماذج: النظام يستعمل ثلاثة نماذج في التشغيلة الواحدة حسب نوع
-   المهمة ويتجاوز الفاشل، فشريحة تقول «minimax-m3:free» كانت تصف واحداً
-   من ثلاثة وتوهم أنه الوحيد. اسم المزوّد أصدق وأقصر. */
-const PROVIDER_LABEL = {
-  gemini: "Gemini", groq: "Groq", cerebras: "Cerebras",
-  mistral: "Mistral", zai: "Z.ai", openrouter: "OpenRouter", ollama: "محلي",
-};
-
-function renderRouting(info) {
-  const r = info.routing || {};
-  const ready = r.ready || [];
-  const active = r.routes ? [...new Set(Object.values(r.routes))].filter(Boolean) : [];
-  if (!ready.length) { $("routing").innerHTML = ""; return; }
-
-  $("routing").innerHTML = ready.map(n => {
-    const on = active.includes(n);
-    return `<span class="pill${on ? " on" : ""}"
-      title="${on ? "يتصدّر التوجيه" : "احتياط عند الفشل"}">
-      ${icon(on ? "zap" : "clock", "i-sm")}${esc(PROVIDER_LABEL[n] || n)}</span>`;
-  }).join("");
-}
-
 async function boot() {
   if (FILE_MODE) {
     $("err").innerHTML = FILE_MSG;
@@ -796,7 +849,6 @@ async function boot() {
     return;
   }
   const r = await fetch("/api/info").then(x => x.json());
-  renderRouting(r);
   stages = r.stages.map(s => ({ label: s[0], hint: s[1], seconds: 0 }));
   $("chips").innerHTML = SUGGESTIONS
     .map(s => `<span class="chip">${esc(s)}</span>`).join("");
@@ -848,6 +900,9 @@ async function start() {
   $("hero").style.display = "none";
   $("err").innerHTML = "";
   $("result").classList.remove("on");
+  $("report").classList.remove("on");
+  $("askBox").classList.remove("on");
+  $("askLog").innerHTML = "";
   $("run").classList.add("on");
   $("runTopic").textContent = topic;
 
@@ -941,10 +996,27 @@ function showResult(d) {
   $("facts").innerHTML = rows.map(([k, v]) =>
     `<tr><th style="width:9rem">${esc(k)}</th><td>${esc(v)}</td></tr>`).join("");
 
+  const md = (d.stats && d.stats.md_path) || d.path;
   $("actions").innerHTML =
-    `<a class="btn btn-default" href="/api/file?p=${encodeURIComponent(d.path)}"
-        target="_blank">${icon("external-link", "i-sm")}فتح التقرير</a>
-     <button class="btn btn-outline" onclick="location.reload()">موضوع جديد</button>`;
+    `<button class="btn btn-outline" id="pdfBtn">${icon("external-link", "i-sm")}تصدير PDF</button>
+     <button class="btn btn-ghost" onclick="location.reload()">موضوع جديد</button>`;
+  $("pdfBtn").onclick = async () => {
+    const b = $("pdfBtn"), was = b.innerHTML;
+    b.disabled = true; b.innerHTML = icon("loader-circle", "i-sm spin");
+    try {
+      const r = await fetch("/api/pdf", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: md }),
+      }).then(x => x.json());
+      if (r.error) throw new Error(r.error);
+      window.open("/api/file?p=" + encodeURIComponent(r.path), "_blank");
+    } catch (e) {
+      $("err").innerHTML =
+        `<div class="alert alert-destructive">${icon("triangle-alert")}${esc(e.message)}</div>`;
+    }
+    b.disabled = false; b.innerHTML = was;
+  };
+  showReport(md);
 
   if (d.warnings && d.warnings.length) {
     $("err").innerHTML = d.warnings
@@ -954,6 +1026,134 @@ function showResult(d) {
     $("err").innerHTML += `<div class="alert alert-destructive">انتهت المهلة — التقرير جزئي.</div>`;
   }
   $("result").classList.add("on");
+}
+
+/* ---------- عارض Markdown ----------
+   محوّل مصغّر بدل مكتبة: markdown-it يزن ~100 كيلوبايت ويحتاج CDN،
+   والتقرير يستعمل مجموعة محدودة معروفة - عناوين وقوائم وجداول وغامق
+   وأسطر أفقية. عشرون سطراً تغطّيها.
+
+   كتل <svg> و<div> تمرّ كما هي: المخططات مُدرَجة في التقرير كـSVG خام،
+   وأيّ هروب لها يحوّلها إلى نصّ معروض. مصدرها خادمنا لا مُدخَل مستخدم. */
+function mdToHtml(md) {
+  const raw = [];
+  // نحمي الكتل الخام قبل الهروب ونعيدها بعده
+  md = md.replace(/<div[\s\S]*?<\/div>|<svg[\s\S]*?<\/svg>/gi, m => {
+    raw.push(m);
+    return ` RAW${raw.length - 1} `;
+  });
+
+  const esc = t => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const inline = t => esc(t)
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g,
+             '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+  const out = [];
+  const lines = md.split("\n");
+  let i = 0, list = null;
+
+  const closeList = () => { if (list) { out.push(`</${list}>`); list = null; } };
+
+  while (i < lines.length) {
+    const ln = lines[i];
+
+    if (/^ RAW\d+ $/.test(ln.trim())) {
+      closeList();
+      out.push(raw[+ln.trim().match(/\d+/)[0]]);
+      i++; continue;
+    }
+
+    // جدول: سطر عناوين ثم سطر فاصل ثم صفوف
+    if (ln.includes("|") && /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(lines[i + 1] || "")) {
+      closeList();
+      const cells = r => r.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|");
+      const head = cells(ln).map(c => `<th>${inline(c.trim())}</th>`).join("");
+      const body = [];
+      i += 2;
+      while (i < lines.length && lines[i].includes("|")) {
+        body.push("<tr>" + cells(lines[i]).map(c =>
+          `<td>${inline(c.trim())}</td>`).join("") + "</tr>");
+        i++;
+      }
+      out.push(`<div class="tw"><table><thead><tr>${head}</tr></thead>`
+               + `<tbody>${body.join("")}</tbody></table></div>`);
+      continue;
+    }
+
+    let m;
+    if ((m = ln.match(/^(#{1,4})\s+(.*)$/))) {
+      closeList();
+      out.push(`<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`);
+    } else if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(ln)) {
+      closeList(); out.push("<hr>");
+    } else if ((m = ln.match(/^\s*>\s?(.*)$/))) {
+      closeList(); out.push(`<blockquote>${inline(m[1])}</blockquote>`);
+    } else if ((m = ln.match(/^\s*(\d+)[.)]\s+(.*)$/))) {
+      if (list !== "ol") { closeList(); out.push("<ol>"); list = "ol"; }
+      out.push(`<li>${inline(m[2])}</li>`);
+    } else if ((m = ln.match(/^\s*[-*]\s+(.*)$/))) {
+      if (list !== "ul") { closeList(); out.push("<ul>"); list = "ul"; }
+      out.push(`<li>${inline(m[1])}</li>`);
+    } else if (!ln.trim()) {
+      closeList();
+    } else {
+      closeList();
+      out.push(`<p>${inline(ln)}</p>`);
+    }
+    i++;
+  }
+  closeList();
+  return out.join("\n");
+}
+
+/* ---------- عرض التقرير ومناقشته ---------- */
+let reportPath = null;
+
+async function showReport(path) {
+  reportPath = path;
+  try {
+    const d = await fetch("/api/report?p=" + encodeURIComponent(path))
+      .then(x => x.json());
+    if (d.error) throw new Error(d.error);
+    $("report").innerHTML = mdToHtml(d.markdown);
+    $("report").classList.add("on");
+    $("askBox").classList.add("on");
+  } catch (e) {
+    $("report").innerHTML =
+      `<div class="alert alert-destructive">تعذّر عرض التقرير: ${esc(e.message)}</div>`;
+    $("report").classList.add("on");
+  }
+}
+
+async function askAbout() {
+  const q = $("askInput").value.trim();
+  if (!q || !reportPath) return;
+  $("askInput").value = "";
+  $("askInput").style.height = "auto";
+  $("askGo").disabled = true;
+
+  const block = document.createElement("div");
+  block.className = "qa";
+  block.innerHTML = `<div class="q">${esc(q)}</div>
+    <div class="a muted">${icon("loader-circle", "i-sm spin")} …</div>`;
+  $("askLog").appendChild(block);
+  block.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+  try {
+    const d = await fetch("/api/ask", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: q, path: reportPath }),
+    }).then(x => x.json());
+    block.querySelector(".a").className = d.error ? "a muted" : "a";
+    block.querySelector(".a").textContent = d.error || d.answer;
+  } catch (e) {
+    block.querySelector(".a").textContent = "تعذّر الاتصال: " + e.message;
+  }
+  $("askGo").disabled = false;
+  $("askInput").focus();
 }
 
 /* ---------- لوحة المعلومات ---------- */
@@ -1093,6 +1293,16 @@ loaders.svc = { done: false, fn: async () =>
 setTheme(document.documentElement.dataset.theme || "dark");
 $("themeBtn").onclick = () =>
   setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+
+$("askGo").onclick = askAbout;
+$("askInput").addEventListener("input", () => {
+  const t = $("askInput");
+  t.style.height = "auto";
+  t.style.height = Math.min(t.scrollHeight, 176) + "px";
+});
+$("askInput").addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); askAbout(); }
+});
 
 paintIcons();
 boot();

@@ -47,7 +47,7 @@ cp .env.example .env
 | `SERPER_API_KEY` | لا (لكن بدونه لا بحث حقيقي) | https://serper.dev — 2500 طلب مجاناً |
 | `MODEL` | لا | افتراضياً نموذج مجاني |
 | `RUN_TIMEOUT` | لا | سقف التشغيلة بالثواني، افتراضياً 1500 (25 دقيقة) |
-| `MAKE_PDF` | لا | `1` افتراضياً — ضع `0` لتعطيل توليد PDF |
+| `MAKE_PDF` | لا | `0` افتراضياً — التقرير يُعرض في الصفحة، وزرّ «تصدير PDF» يولّده عند الطلب |
 | `HIDE_SOURCES` | لا | `1` افتراضياً — يحذف المصادر من نص التقرير |
 | `AUTO_UPDATE_HOURS` | لا | `6` افتراضياً — دورة رادار الفرص · `0` يعطّلها |
 
@@ -183,6 +183,7 @@ MODEL=ollama/qwen2.5:3b python app.py
 نقاط الواجهة:
 `/api/info` · `/api/status` · `/api/run` (بث) · `/api/cancel` · `/api/file`
 · `/api/dashboard` · `/api/services` · `/api/service` (POST) · `/api/schedule`
+· `/api/report` · `/api/pdf` (POST) · `/api/ask` (POST)
 
 ### جودة المصادر
 

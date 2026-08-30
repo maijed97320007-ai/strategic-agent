@@ -51,7 +51,10 @@ RUN_TIMEOUT = int(os.getenv("RUN_TIMEOUT", "1500"))
 AGENT_MAX_TOKENS = int(os.getenv("AGENT_MAX_TOKENS", "3500"))
 SYNTH_MAX_TOKENS = int(os.getenv("SYNTH_MAX_TOKENS", "9000"))
 
-MAKE_PDF = _flag("MAKE_PDF", "1")
+# صفر افتراضاً: التقرير يُعرض في الصفحة نفسها الآن، وتوليد PDF يشغّل
+# Edge بلا واجهة ويضيف ثوانيَ لكل تشغيلة لملفٍ قد لا يُفتح. زرّ «تصدير
+# PDF» في بطاقة النتيجة يولّده عند الطلب.
+MAKE_PDF = _flag("MAKE_PDF", "0")
 
 # إخفاء المصادر من نص التقرير. تبقى في knowledge.db وتُسترجع بـ:
 #   python memory.py sources
@@ -568,6 +571,7 @@ def finish_run(report: str, topic: str) -> tuple[str, dict, list[str]]:
         warnings.append(f"تعذّر التقييم المستقل: {type(e).__name__}: {e}")
 
     path = save_report(body, topic)
+    md_path = path
 
     if MAKE_PDF:
         try:
@@ -576,6 +580,7 @@ def finish_run(report: str, topic: str) -> tuple[str, dict, list[str]]:
         except Exception as e:
             warnings.append(f"تعذّر توليد PDF: {e}")
 
+    stats["md_path"] = md_path        # الواجهة تعرض Markdown لا PDF
     return path, stats, warnings
 
 

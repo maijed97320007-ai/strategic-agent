@@ -310,6 +310,100 @@ async def service_run(request):
                 pass
 
 
+def _safe(raw: str) -> Path | None:
+    """يقيّد أي مسار وارد بمجلد output - وإلا صار المسار قراءةً حرّة للقرص."""
+    try:
+        q = Path(raw).resolve()
+        q.relative_to((ROOT / "output").resolve())
+    except (ValueError, OSError):
+        return None
+    return q if q.is_file() else None
+
+
+async def report_md(request):
+    """نصّ التقرير كما هو - الواجهة تعرضه في الصفحة بدل فتح ملف."""
+    q = _safe(request.query_params.get("p") or "")
+    if q is None:
+        return JSONResponse({"error": "مسار غير مسموح أو غير موجود"}, status_code=403)
+    return JSONResponse({"markdown": q.read_text(encoding="utf-8"),
+                         "name": q.stem})
+
+
+async def make_pdf(request):
+    """
+    يولّد PDF عند الطلب لا في كل تشغيلة.
+
+    توليده يشغّل Edge بلا واجهة ويضيف ثوانيَ لملفٍ قد لا يُفتح أصلاً،
+    والتقرير صار يُقرأ في الصفحة. فبقي زرّاً لمن يريد نسخة للطباعة.
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    q = _safe(payload.get("path") or "")
+    if q is None:
+        return JSONResponse({"error": "مسار غير مسموح"}, status_code=403)
+    try:
+        import pdf
+        out = await asyncio.to_thread(pdf.markdown_to_pdf, q)
+        return JSONResponse({"path": str(out), "name": Path(out).name})
+    except Exception as e:
+        return JSONResponse({"error": f"{type(e).__name__}: {e}"}, status_code=500)
+
+
+ASK_BRIEF = """أنت تجيب عن أسئلة حول تقرير أنتجتَه للتوّ.
+
+قواعد ملزِمة:
+- أجب من التقرير نفسه. إن لم يحوِ الجواب فقل ذلك صراحةً ولا تخترع.
+- لا تعِد سرد التقرير - أجب عن السؤال المطروح وحده.
+- بالعربية، مباشرةً، بلا مقدمات ولا اعتذارات.
+- الأرقام التي تذكرها يجب أن تكون في التقرير حرفياً.
+
+--- التقرير ---
+{report}
+--- نهاية التقرير ---
+
+السؤال: {question}"""
+
+
+async def ask(request):
+    """سؤال متابعة عن تقرير - يقرأ التقرير كسياق ولا يبحث من جديد."""
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    question = (payload.get("question") or "").strip()
+    q = _safe(payload.get("path") or "")
+    if not question:
+        return JSONResponse({"error": "لا يوجد سؤال"}, status_code=400)
+    if q is None:
+        return JSONResponse({"error": "التقرير غير موجود"}, status_code=404)
+
+    _touch()
+    if not _RUN_LOCK.acquire(blocking=False):
+        return JSONResponse({"error": "هناك تشغيلة جارية — انتظر انتهاءها."},
+                            status_code=409)
+    try:
+        def run():
+            import providers
+            # سياق مليون رمز عند Gemini يستوعب التقرير كاملاً، وحدّ 60 ألف
+            # حرف يحمي المزوّدين الأضيق سياقاً في سلسلة التجاوز.
+            body = q.read_text(encoding="utf-8")[:60000]
+            llm, _p = providers.make_llm(providers.BROAD, 0, temperature=0.3,
+                                         max_tokens=1200, timeout=180)
+            return str(llm.call(ASK_BRIEF.format(report=body, question=question)))
+
+        answer = await asyncio.to_thread(run)
+        return JSONResponse({"answer": answer.strip()})
+    except Exception as e:
+        return JSONResponse({"error": f"{type(e).__name__}: {e}"}, status_code=500)
+    finally:
+        try:
+            _RUN_LOCK.release()
+        except RuntimeError:
+            pass
+
+
 async def serve_file(request):
     """
     يفتح ملف تقرير. مقيّد بمجلد output وحده حتى لا يتحوّل لقراءة عشوائية
@@ -342,6 +436,9 @@ _ROUTES = [
     Route("/api/schedule", schedule_status),
     Route("/api/services", service_list),
     Route("/api/service", service_run, methods=["POST"]),
+    Route("/api/report", report_md),
+    Route("/api/pdf", make_pdf, methods=["POST"]),
+    Route("/api/ask", ask, methods=["POST"]),
     Route("/api/file", serve_file),
 ]
 
