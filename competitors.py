@@ -21,7 +21,10 @@ import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-DB = "knowledge.db"
+try:
+    from memory import DB_DEFAULT as DB
+except ImportError:
+    DB = "knowledge.db"
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS competitors (

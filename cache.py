@@ -23,7 +23,25 @@ from pathlib import Path
 
 TTL_HOURS = float(os.getenv("CACHE_TTL_HOURS", "6"))
 ENABLED = os.getenv("CACHE", "1").strip().lower() not in ("0", "false", "no")
-DB = "knowledge.db"
+def _db_path() -> str:
+    """
+    مسار قاعدة المعرفة.
+
+    كان `"knowledge.db"` نسبياً فيُحلّ حسب **مجلد التشغيل** لا مجلد
+    البرنامج. داخل الـEXE هذا عطل صامت: تشغيله من مجلد آخر يُنشئ قاعدة
+    فارغة جديدة، فتبدو الفرص والمعرفة والتنبؤات كلها ضائعة بلا رسالة خطأ.
+    نثبّتها بجانب البرنامج، ويبقى KNOWLEDGE_DB لمن أراد مساراً آخر.
+    """
+    if env := os.getenv("KNOWLEDGE_DB"):
+        return env
+    if getattr(sys, "frozen", False):
+        base = Path(sys.executable).parent
+    else:
+        base = Path(__file__).parent
+    return str(base / "knowledge.db")
+
+
+DB = _db_path()
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS search_cache (

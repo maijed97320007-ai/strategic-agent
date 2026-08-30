@@ -26,7 +26,10 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-DB = "knowledge.db"
+try:
+    from memory import DB_DEFAULT as DB
+except ImportError:
+    DB = "knowledge.db"
 
 KINDS = {
     "wrong": "خطأ فني",

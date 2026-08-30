@@ -23,7 +23,10 @@ import sys
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 
-DB = "knowledge.db"
+try:
+    from memory import DB_DEFAULT as DB
+except ImportError:
+    DB = "knowledge.db"
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS predictions (

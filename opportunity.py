@@ -23,6 +23,13 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
 
+# مسار قاعدة المعرفة من memory: السلسلة النسبية تُحلّ حسب مجلد التشغيل،
+# فتشغيل الـEXE من مجلد آخر يفتح قاعدة فارغة بصمت.
+try:
+    from memory import DB_DEFAULT as _DB
+except ImportError:
+    _DB = "knowledge.db"
+
 # أنواع الأحداث المرصودة
 EVENT_TYPES = [
     "مناقصة جديدة", "مشروع جديد", "شركة جديدة", "منتج جديد",
@@ -87,7 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_op_score ON opportunities(score DESC);
 """
 
 
-def _db(path: str = "knowledge.db") -> sqlite3.Connection:
+def _db(path: str = _DB) -> sqlite3.Connection:
     con = sqlite3.connect(path)
     con.row_factory = sqlite3.Row
     con.executescript(_SCHEMA)

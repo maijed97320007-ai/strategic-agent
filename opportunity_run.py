@@ -9,6 +9,9 @@ from __future__ import annotations
 import json
 import sys
 
+# المسار المطلق من opportunity: السلسلة النسبية تُحلّ حسب مجلد التشغيل،
+# فتشغيل الـEXE من مجلد آخر يفتح قاعدة فارغة بصمت.
+from opportunity import _DB
 from opportunity import (EVENT_TYPES, INVESTIGATE, WATCH, Event, Scored,
                          _db, _now, band_of, collect, load_profile, score_one)
 
@@ -73,7 +76,7 @@ CLASSIFY_BRIEF = """أنت محلل فرص. أمامك ملف شركة وقائ�
 
 
 def detect(profile: dict | None = None, extra_queries: list[str] | None = None,
-           on_stage=None, db: str = "knowledge.db") -> list[Scored]:
+           on_stage=None, db: str = _DB) -> list[Scored]:
     import main
     import pipeline
 
@@ -157,7 +160,7 @@ def detect(profile: dict | None = None, extra_queries: list[str] | None = None,
     return scored
 
 
-def persist(scored: list[Scored], db: str = "knowledge.db") -> None:
+def persist(scored: list[Scored], db: str = _DB) -> None:
     con = _db(db)
     for s in scored:
         e = s.event
@@ -212,7 +215,7 @@ def _source_map(con) -> dict[str, list[dict]]:
     return out
 
 
-def recent(limit: int = 20, min_score: int = 0, db: str = "knowledge.db") -> list[dict]:
+def recent(limit: int = 20, min_score: int = 0, db: str = _DB) -> list[dict]:
     con = _db(db)
     rows = con.execute(
         "SELECT o.*, e.url, e.company, e.location, e.event_type, e.source_id"

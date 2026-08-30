@@ -15,6 +15,13 @@
 """
 from __future__ import annotations
 
+# مسار قاعدة المعرفة من memory: السلسلة النسبية تُحلّ حسب مجلد التشغيل،
+# فتشغيل الـEXE من مجلد آخر يفتح قاعدة فارغة بصمت.
+try:
+    from memory import DB_DEFAULT as _DB
+except ImportError:
+    _DB = "knowledge.db"
+
 import json
 import sys
 from datetime import date
@@ -62,7 +69,7 @@ BOARD_BRIEF = """أنت مجلس إدارة يجتمع شهرياً. أمامك 
 - الميزانية بالريال العُماني وضمن سقف الشركة المذكور في ملفها."""
 
 
-def gather(db: str = "knowledge.db") -> dict:
+def gather(db: str = _DB) -> dict:
     """يجمع مخزون الفترة من القاعدة - قراءة فقط."""
     import dashboard
     import opportunity
@@ -104,7 +111,7 @@ def _fmt(data: dict) -> dict:
             "predictions": pred, "conflicts": conf}
 
 
-def convene(db: str = "knowledge.db", on_stage=None) -> dict:
+def convene(db: str = _DB, on_stage=None) -> dict:
     import main
     import pipeline
 

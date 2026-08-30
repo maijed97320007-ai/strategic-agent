@@ -16,7 +16,12 @@ import sqlite3
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-DB = "knowledge.db"
+# المسار من memory لا سلسلة نسبية: التشغيل من مجلد آخر كان يفتح قاعدة
+# فارغة بصمت فتبدو اللوحة خاوية.
+try:
+    from memory import DB_DEFAULT as DB
+except ImportError:
+    DB = "knowledge.db"
 
 
 def _con(path: str = DB) -> sqlite3.Connection | None:
@@ -60,8 +65,13 @@ def snapshot(path: str = DB, out_dir: str = "output") -> dict:
                 "o.evidence,o.created_at, e.url,e.company,e.location,e.event_type"
                 " FROM opportunities o LEFT JOIN events e ON e.id=o.event_id"
                 " ORDER BY o.score DESC LIMIT 25")
-        d["opp_bands"] = {r["band"]: r["n"] for r in q(
-            "SELECT band, COUNT(*) n FROM opportunities GROUP BY band")}
+        # الأشرطة تُحسب من القائمة بعد إزالة التكرار لا من الصفوف الخام:
+        # جولتان على نفس الحدث تكتبان صفّين، فكانت الترويسة تقول 96 فرصة
+        # بينما القائمة تحتها ثمانية عشر.
+        bands: dict[str, int] = {}
+        for r in d["opportunities"]:
+            bands[r["band"]] = bands.get(r["band"], 0) + 1
+        d["opp_bands"] = bands
 
     # ── رادار المنافسين ──
     if "competitors" in t:

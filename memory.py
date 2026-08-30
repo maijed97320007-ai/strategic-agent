@@ -17,15 +17,36 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import sqlite3
+import sys
 import unicodedata
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from difflib import SequenceMatcher
+from pathlib import Path
 from typing import Any, Iterable
 
-DB_DEFAULT = "knowledge.db"
+def _db_path() -> str:
+    """
+    مسار قاعدة المعرفة.
+
+    كان `"knowledge.db"` نسبياً فيُحلّ حسب **مجلد التشغيل** لا مجلد
+    البرنامج. داخل الـEXE هذا عطل صامت: تشغيله من مجلد آخر يُنشئ قاعدة
+    فارغة جديدة، فتبدو الفرص والمعرفة والتنبؤات كلها ضائعة بلا رسالة خطأ.
+    نثبّتها بجانب البرنامج، ويبقى KNOWLEDGE_DB لمن أراد مساراً آخر.
+    """
+    if env := os.getenv("KNOWLEDGE_DB"):
+        return env
+    if getattr(sys, "frozen", False):
+        base = Path(sys.executable).parent
+    else:
+        base = Path(__file__).parent
+    return str(base / "knowledge.db")
+
+
+DB_DEFAULT = _db_path()
 
 _SCHEMA = """
 PRAGMA journal_mode=WAL;
