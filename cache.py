@@ -160,14 +160,19 @@ def prune(path: str = DB) -> int:
         return 0
 
 
-def cached_search(tool, query: str, path: str = DB):
+def cached_search(tool, query: str, path: str = DB,
+                  ttl_hours: float | None = None):
     """
     يغلّف أداة البحث بالذاكرة المؤقتة.
 
     نخزّن حتى النتائج الفارغة: استعلام لا يعيد شيئاً سيظل كذلك خلال
     الساعات القليلة القادمة، وإعادة سؤاله هدر للحصة.
+
+    `ttl_hours` لمن يعرف أن نتيجته تتقادم ببطء: رادار الفرص يُطلق 33
+    استعلاماً كل جولة، وبجولة كل ست ساعات يحرق حصة Serper المجانية
+    (2500) في تسعة عشر يوماً. وكراسة المناقصة لا تتغيّر كل ست ساعات.
     """
-    hit = get(query, path)
+    hit = get(query, path, ttl_hours=ttl_hours)
     if hit is not None:
         return hit
     try:

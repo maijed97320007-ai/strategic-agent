@@ -220,7 +220,9 @@ def _judge(_a: dict) -> str:
     if not judge.is_up() and not judge.ensure_server():
         return "محكّم Mastra غير متاح — يحتاج Node.js وتشغيل mastra/server.mjs."
     from pathlib import Path
-    reports = sorted(Path("output").glob("*.md"), key=lambda p: -p.stat().st_mtime)
+    from main import out_dir_default
+    reports = sorted(Path(out_dir_default()).glob("*.md"),
+                     key=lambda p: -p.stat().st_mtime)
     if not reports:
         return "لا تقارير لتحكيمها."
     md = reports[0].read_text(encoding="utf-8")

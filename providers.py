@@ -21,6 +21,11 @@ from dataclasses import dataclass
 
 try:                              # ليعمل مستقلاً كأداة تشخيص أيضاً
     from dotenv import load_dotenv
+    try:
+        from main import app_dir
+        load_dotenv(app_dir() / ".env")
+    except ImportError:
+        pass
     load_dotenv()
 except ImportError:
     pass

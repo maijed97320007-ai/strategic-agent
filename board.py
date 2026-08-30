@@ -198,7 +198,13 @@ def render(res: dict) -> str:
     return "\n".join(out)
 
 
-def save(res: dict, out_dir: str = "output") -> str:
+def save(res: dict, out_dir: str | None = None) -> str:
+    if out_dir is None:
+        try:
+            from main import out_dir_default
+            out_dir = out_dir_default()
+        except ImportError:
+            out_dir = "output"
     """يحفظ محضر الاجتماع."""
     import os
     os.makedirs(out_dir, exist_ok=True)

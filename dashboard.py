@@ -37,7 +37,7 @@ def _tables(con) -> set[str]:
         "SELECT name FROM sqlite_master WHERE type='table'")}
 
 
-def snapshot(path: str = DB, out_dir: str = "output") -> dict:
+def snapshot(path: str = DB, out_dir: str | None = None) -> dict:
     """كل ما تعرفه القاعدة، في قاموس واحد."""
     con = _con(path)
     if con is None:
@@ -121,6 +121,12 @@ def snapshot(path: str = DB, out_dir: str = "output") -> dict:
     con.close()
 
     # ── التقارير ──
+    if out_dir is None:
+        try:
+            from main import out_dir_default
+            out_dir = out_dir_default()
+        except ImportError:
+            out_dir = "output"
     od = Path(out_dir)
     if od.is_dir():
         files = sorted((f for f in od.glob("*.md") if f.name != "final_report.md"),

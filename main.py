@@ -31,9 +31,25 @@ for _stream in (sys.stdin, sys.stdout, sys.stderr):
         except (ValueError, OSError):
             pass
 
+from pathlib import Path
+
 from dotenv import load_dotenv
 
-load_dotenv()
+
+def app_dir() -> Path:
+    """
+    مجلد البرنامج - لا مجلد التشغيل.
+
+    الفرق يظهر في الـEXE وحده: يُشغَّل من حيث شاء المستخدم، و`load_dotenv()`
+    المجرّد يبحث من مجلد التشغيل صعوداً. تشغيله من جذر القرص لا يجد .env
+    الموضوع بجانبه، فيقول «OPENROUTER_API_KEY غير موجود» ولا يعمل أصلاً.
+    رُصد فعلياً عند اختبار النسخة المبنيّة.
+    """
+    return Path(sys.executable).parent if getattr(sys, "frozen", False)         else Path(__file__).parent
+
+
+load_dotenv(app_dir() / ".env")
+load_dotenv()          # واحتياطاً: مجلد التشغيل، لمن يضع .env هناك
 
 TODAY = date.today()
 MODEL = os.getenv("MODEL", "openrouter/minimax/minimax-m3:free")
@@ -148,6 +164,18 @@ def _browser_tool():
         return None
 
 
+# مصطلحات فرنسية للسوق المغاربي. صغير عمداً: يكفي لتوجيه استعلام واحد،
+# والترجمة الكاملة تحتاج نداء نموذج لا يستحقّه عائدُ لغةٍ ثالثة.
+_FR = {
+    "desalination": "dessalement", "water": "eau", "treatment": "traitement",
+    "membrane": "membrane", "wastewater": "eaux usées", "reuse": "réutilisation",
+    "reverse": "osmose", "osmosis": "inverse", "plant": "station",
+    "drinking": "potable", "groundwater": "nappe", "brine": "saumure",
+    "energy": "énergie", "industrial": "industriel", "irrigation": "irrigation",
+}
+_FR_ON = os.getenv("SEARCH_FRENCH", "1").strip().lower() not in ("0", "false", "no")
+
+
 def prefetch_research(topic: str, max_queries: int = 4):
     """
     ينفّذ بحثاً فعلياً ويعيد سجل مصادر مرقّمة (S1, S2, …).
@@ -162,21 +190,42 @@ def prefetch_research(topic: str, max_queries: int = 4):
     if tool is None:
         return reg
 
+    # ── استعلامات متعددة اللغات ──
+    #
+    # حصر البحث بالعربية يقصّ أكثر ممّا يجمع: أدبيات معالجة المياه
+    # إنجليزية في أغلبها، وسوق شمال أفريقيا فرنسي التوثيق. والمقتطف بأي
+    # لغة يقرأه النموذج ويكتب منه بالعربية، فاللغة قيدُ بحثٍ لا قيدُ فهم.
+    #
+    # الاستعلام الإنجليزي محسوب أصلاً للقواعد العلمية (scholar) - نعيد
+    # استعماله هنا بلا نداء إضافي.
+    try:
+        import scholar
+        en = scholar.english_query(topic)
+    except Exception:
+        en = ""
+
     # استعلامات موجَّهة نحو المصادر القوية.
     #
     # السبب: البحث العام يعيد ما يتصدّر جوجل - مواقع مورّدين ومنصات تواصل.
     # قياس فعلي على تشغيلة كاملة أعطى متوسط وزن 0.34 وصفر مصدر قوي من 15.
-    # حصر النطاق يجلب الدوريات والجهات الحكومية التي لا تتصدّر البحث العام.
     scholarly = [
-        f"{topic} site:sciencedirect.com OR site:mdpi.com OR site:springer.com",
-        f"{topic} filetype:pdf research study",
+        f"{en or topic} site:sciencedirect.com OR site:mdpi.com OR site:springer.com",
+        f"{en or topic} filetype:pdf research study",
         f"{topic} site:.gov OR site:.edu OR site:iso.org",
     ]
-    general = [topic, f"{topic} تحديات", f"{topic} {TODAY.year}",
-               f"{topic} latest developments"]
 
-    # نبدأ بالقوي: لو نفدت الحصة أو تعثّر البحث، يبقى ما جُمع أعلى جودة
-    queries = (scholarly + general)[:max(3, max_queries + 2)]
+    arabic = [topic, f"{topic} تحديات", f"{topic} {TODAY.year}"]
+
+    english = [f"{en} {TODAY.year}", f"{en} challenges case study",
+               f"{en} cost energy consumption"] if en else               [f"{topic} latest developments"]
+
+    # الفرنسية للسوق المغاربي: تونس والمغرب والجزائر توثّق مشاريعها بها،
+    # ولا تظهر في البحث العربي ولا الإنجليزي.
+    french = [f"{_FR.get(w, w)} {TODAY.year}" for w in (en.split()[:3] or [])]
+    french = [" ".join(french)] if en and _FR_ON else []
+
+    # الترتيب مقصود: القوي أولاً، فلو نفدت الحصة بقي الأجود
+    queries = scholarly + english + arabic + french
 
     import cache
 
@@ -233,13 +282,21 @@ def prefetch_research(topic: str, max_queries: int = 4):
     return _prune_weak(reg)
 
 
-def _prune_weak(reg, floor: int = 12):
+def _prune_weak(reg, floor: int = 12, cap: int = 30):
     """
-    يسقط أضعف المصادر متى بقي عدد كافٍ.
+    يسقط أضعف المصادر ويضع سقفاً للعدد.
 
-    منصات التواصل والمنتديات كانت تدخل السجل بوزن 0.20 وتُستشهد بها كأي
-    مصدر آخر. حذفها حين يتوفّر البديل يرفع متوسط الوزن بلا أن يترك وكيلاً
-    بلا سند - ولذلك نُبقيها إن قلّ السجل عن `floor`.
+    شيئان مختلفان يعالجهما:
+
+    · **الضعيف**: منصات التواصل والمنتديات كانت تدخل السجل بوزن 0.20
+      وتُستشهد بها كأي مصدر. حذفها حين يتوفّر البديل يرفع المتوسط بلا أن
+      يترك وكيلاً بلا سند - ولذلك نُبقيها إن قلّ السجل عن `floor`.
+
+    · **الكثير**: البحث بثلاث لغات رفع الحصيلة من ثلاثين مصدراً إلى
+      أربعة وخمسين، والسجل كاملاً يُحقن في مُوجَّه **كل** وكيل. الزيادة
+      تُثقل السياق وتُميّع الانتباه أكثر ممّا تُثري. نُبقي الأقوى وزناً
+      مع حفظ الترتيب - العلمية تبقى في المقدّمة لأن الوكلاء يستشهدون
+      بأوائل السجل أكثر.
     """
     try:
         import trust
@@ -247,7 +304,26 @@ def _prune_weak(reg, floor: int = 12):
         return reg
 
     keep = [s for s in reg.items if trust.weight(s.url) > 0.25]
-    if len(keep) < floor or len(keep) == len(reg.items):
+    if len(keep) < floor:
+        keep = list(reg.items)
+
+    if len(keep) > cap:
+        # حصّة محجوزة للمصدر الميداني.
+        #
+        # الاختيار بالوزن وحده جعل السجل ثلاثين ورقة محكّمة بمتوسط 0.88
+        # وصفر مصدر تجاري - وهذا إفراط لا إتقان: الورقة تجيب «ما الذي
+        # يحدث فيزيائياً» ولا تجيب «كم سعره في عُمان اليوم ومن يورّده».
+        # التقرير يحتاج الاثنين، والفرق أن الترجيح يعرف أيّهما أثقل.
+        order = {id(s): i for i, s in enumerate(keep)}
+        strong = [s for s in keep if trust.weight(s.url) >= 0.75]
+        field = [s for s in keep if trust.weight(s.url) < 0.75]
+
+        quota = min(len(field), max(6, cap // 4))
+        picked = (sorted(strong, key=lambda s: -trust.weight(s.url))[:cap - quota]
+                  + sorted(field, key=lambda s: -trust.weight(s.url))[:quota])
+        keep = sorted(picked, key=lambda s: order[id(s)])
+
+    if len(keep) == len(reg.items):
         return reg
 
     import sources
@@ -531,7 +607,13 @@ def strip_sources(md: str) -> str:
     return re.sub(r"\x00SVG(\d+)\x00", lambda m: keep[int(m.group(1))], md)
 
 
-def save_report(report: str, topic: str, out_dir: str = "output") -> str:
+def out_dir_default() -> str:
+    """مجلد التقارير بجانب البرنامج - وإلا تناثرت في مجلد التشغيل."""
+    return str(app_dir() / "output")
+
+
+def save_report(report: str, topic: str, out_dir: str | None = None) -> str:
+    out_dir = out_dir or out_dir_default()
     os.makedirs(out_dir, exist_ok=True)
     slug = re.sub(r"[^\w؀-ۿ]+", "_", topic)[:40].strip("_")
     path = os.path.join(out_dir, f"{TODAY.isoformat()}_{slug}.md")

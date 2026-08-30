@@ -40,6 +40,19 @@ EVENT_TYPES = [
 # عتبات القرار
 HIGH, INVESTIGATE, WATCH = 85, 70, 50
 
+# النطاق حين لا يحدّده profile.json
+DEFAULT_REGIONS = ("الخليج", "السعودية", "الإمارات", "قطر", "الكويت",
+                   "شمال أفريقيا", "مصر", "الأردن")
+
+# صلاحية ذاكرة الرادار. أطول من الافتراضي (6) عمداً: المناقصة تبقى
+# مفتوحة أسابيع، والجولة كل ست ساعات بـ33 استعلاماً تستنزف الحصة
+# المجانية في تسعة عشر يوماً. بـ24 ساعة تُنفَّذ جولة حقيقية من كل أربع.
+RADAR_TTL = float(os.getenv("RADAR_CACHE_HOURS", "24"))
+
+# دول تُسأل بالإنجليزية: أسواق تحلية كبرى لا تُوثّق مناقصاتها بالعربية
+EN_COUNTRIES = ("Saudi Arabia", "UAE", "Egypt", "Morocco", "India",
+                "Spain", "Australia", "Chile")
+
 
 def _root() -> Path:
     return Path(sys.executable).parent if getattr(sys, "frozen", False) \
@@ -164,39 +177,55 @@ def collect(profile: dict, extra_queries: list[str] | None = None,
     country = profile.get("country", "")
     kws = profile.get("keywords", [])[:6]
 
-    # النطاق الجغرافي من الملف. الافتراضي عالمي لا محلي: حصر البحث ببلد
-    # واحد كان يجعل الرادار يرى مناقصات السلطنة وحدها بينما أكبر مشاريع
-    # التحلية تُطرح في الخليج وشمال أفريقيا وآسيا. البلد يبقى أولاً لأن
-    # القرب ميزة حقيقية في التنفيذ، لكنه لم يعد سقفاً.
-    regions = profile.get("regions") or [
-        country, "الخليج", "السعودية", "الإمارات", "شمال أفريقيا",
-    ]
-    regions = [r for r in dict.fromkeys(regions) if r]
+    # ── النطاق الجغرافي ──
+    # الافتراضي عالمي لا محلي: حصر البحث ببلد واحد كان يجعل الرادار يرى
+    # مناقصات السلطنة وحدها بينما أكبر مشاريع التحلية تُطرح في الخليج
+    # وشمال أفريقيا وآسيا. البلد يبقى أولاً لأن القرب ميزة تنفيذية
+    # حقيقية، لكنه لم يعد سقفاً.
+    regions = profile.get("regions") or list(DEFAULT_REGIONS)
+    regions = [r for r in dict.fromkeys([country] + list(regions)) if r]
+    span = int(os.getenv("RADAR_REGIONS", "6"))
 
-    ar_kws = [k for k in kws if any("؀" <= c <= "ۿ" for c in k)]
+    def _arabic(k: str) -> bool:
+        return any("؀" <= c <= "ۿ" for c in k)
 
-    # الإنجليزية من القائمة كاملة لا من أول ستّ: الاختصارات القصيرة تتصدّر
-    # الترتيب عادةً («RO») وهي أسوأ استعلام ممكن - «RO tender» تعيد رومانيا
-    # وأنصاف كلمات. نشترط أربعة أحرف فأكثر.
+    ar_kws = [k for k in kws if _arabic(k)]
+
+    # الفحص بالأبجدية لا بـ«ليست في أول ستّ»: القائمة الأولى مقصوصة عند
+    # ستّ كلمات، فكانت «مياه جوفية» و«ملوحة» تسقط خارجها وتُعامَل
+    # كإنجليزية - فتخرج استعلامات مثل «مياه جوفية tender 2026».
+    # وشرط أربعة أحرف يُسقط الاختصارات: «RO tender» تعيد رومانيا.
     en_kws = [k for k in profile.get("keywords", [])
-              if k not in ar_kws and len(k) >= 4]
+              if not _arabic(k) and len(k) >= 4]
 
+    year = date.today().year
     queries = list(extra_queries or [])
-    for r in regions[:4]:
+
+    # ── العربية: الخليج والمشرق ──
+    for r in regions[:span]:
         queries += [f"{k} {r} مناقصة" for k in ar_kws[:2]]
         queries += [f"{k} {r} مشروع جديد" for k in ar_kws[:1]]
 
-    # الإنجليزية ليست ترفاً: بوابات المناقصات الدولية ونشرات الترسية
-    # لا تُنشر بالعربية، وهي مصدر أغلب المشاريع خارج المنطقة.
+    # ── الإنجليزية: البوابات الدولية ونشرات الترسية ──
+    # لا تُنشر بالعربية أصلاً، وهي مصدر أغلب المشاريع خارج المنطقة.
     for k in (en_kws or ["desalination", "water treatment"])[:2]:
-        queries += [f"{k} tender {date.today().year}",
-                    f"{k} project awarded {date.today().year}",
+        queries += [f"{k} tender {year}",
+                    f"{k} project awarded {year}",
                     f"{k} plant contract international tender"]
+    for c in EN_COUNTRIES[:span]:
+        queries.append(f"{(en_kws or ['desalination'])[0]} tender {c} {year}")
+
+    # ── الفرنسية: السوق المغاربي ──
+    # تونس والمغرب والجزائر توثّق مناقصاتها بالفرنسية، ولا تظهر في البحث
+    # العربي ولا الإنجليزي. ثلاثة استعلامات تفتح ثلاث دول.
+    if os.getenv("RADAR_FRENCH", "1").strip().lower() not in ("0", "false", "no"):
+        for c in ("Maroc", "Tunisie", "Algérie"):
+            queries.append(f"appel d'offres dessalement eau {c} {year}")
 
     import cache
 
     for q in queries:
-        res = cache.cached_search(tool, q)
+        res = cache.cached_search(tool, q, ttl_hours=RADAR_TTL)
         if res is None:
             continue
         organic = (res or {}).get("organic", []) if isinstance(res, dict) else []
