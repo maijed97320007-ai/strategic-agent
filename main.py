@@ -120,8 +120,20 @@ KIND_OF = {"A1": "fast", "A2": "analytic", "A3": "analytic", "A4": "analytic",
 #
 # الموجة الأولى (A1-A4) تأخذ إزاحات مختلفة كلها لأنها تعمل معاً، وكذلك
 # الثانية (A5-A7). والمركّب والفريق الأحمر منفردان فتكفيهما الصفر.
-AGENT_SPREAD = {"A1": 0, "A2": 1, "A3": 2, "A4": 3,
-                "A5": 1, "A6": 2, "A7": 3, "RED": 0, "SYN": 0}
+#
+# **متى يضرّ التوزيع؟** الموجة تنتهي بانتهاء أبطأ عضو فيها، فتوزيعها على
+# مزوّدين متفاوتَي السرعة يجرّها إلى زمن الأبطأ. قياس فعلي: Gemini 10.7
+# ثانية للنداء مقابل 19.3 لـOpenRouter - أي أن وكيلاً على الثاني يضيف
+# نحو تسع ثوانٍ للموجة كلها. التوزيع يكسب حين يتقارب المزوّدون أو حين
+# يخنق أحدهم التزامن، ويخسر حين يتباعدون.
+#
+# SPREAD_AGENTS=0 يوقفه فيعمل الجميع على أسرع مزوّد في السلسلة.
+SPREAD_ON = (os.getenv("SPREAD_AGENTS", "1").strip().lower()
+             not in ("0", "false", "no"))
+
+AGENT_SPREAD = ({"A1": 0, "A2": 1, "A3": 2, "A4": 3,
+                 "A5": 1, "A6": 2, "A7": 3, "RED": 0, "SYN": 0}
+                if SPREAD_ON else {})
 
 _KEY_ENV = {"openrouter/": "OPENROUTER_API_KEY", "gpt-": "OPENAI_API_KEY",
             "openai/": "OPENAI_API_KEY", "anthropic/": "ANTHROPIC_API_KEY"}
@@ -652,7 +664,16 @@ def strip_sources(md: str) -> str:
 
 
 def out_dir_default() -> str:
-    """مجلد التقارير بجانب البرنامج - وإلا تناثرت في مجلد التشغيل."""
+    """
+    مجلد التقارير بجانب البرنامج - وإلا تناثرت في مجلد التشغيل.
+
+    OUTPUT_DIR يوحّده بين النسخة العادية والـEXE كما يفعل KNOWLEDGE_DB
+    بقاعدة المعرفة: بدونه لكلٍّ مجلدها، فتعرض اللوحة قائمة تقارير مختلفة
+    حسب أيّ نسخة فتحتها. النسبي يُحلّ من مجلد البرنامج لا مجلد التشغيل.
+    """
+    if env := (os.getenv("OUTPUT_DIR") or "").strip():
+        q = Path(env)
+        return str(q if q.is_absolute() else (app_dir() / q).resolve())
     return str(app_dir() / "output")
 
 

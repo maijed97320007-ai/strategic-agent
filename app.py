@@ -255,7 +255,7 @@ async def dash(_request):
     """لقطة اللوحة - قراءة فقط، بلا نموذج ولا شبكة."""
     try:
         import dashboard
-        return JSONResponse(dashboard.snapshot(out_dir=str(ROOT / "output")))
+        return JSONResponse(dashboard.snapshot(out_dir=core.out_dir_default()))
     except Exception as e:
         return JSONResponse({"error": f"{type(e).__name__}: {e}"}, status_code=500)
 
@@ -324,7 +324,7 @@ def _safe(raw: str) -> Path | None:
     """يقيّد أي مسار وارد بمجلد output - وإلا صار المسار قراءةً حرّة للقرص."""
     try:
         q = Path(raw).resolve()
-        q.relative_to((ROOT / "output").resolve())
+        q.relative_to(Path(core.out_dir_default()).resolve())
     except (ValueError, OSError):
         return None
     return q if q.is_file() else None
@@ -422,8 +422,7 @@ async def serve_file(request):
     raw = request.query_params.get("p") or ""
     try:
         p = Path(raw).resolve()
-        out = (ROOT / "output").resolve()
-        p.relative_to(out)
+        p.relative_to(Path(core.out_dir_default()).resolve())
     except (ValueError, OSError):
         return JSONResponse({"error": "مسار غير مسموح"}, status_code=403)
 
