@@ -51,27 +51,89 @@ def looks_like_portal(title: str, url: str = "") -> bool:
     return bool(PORTAL.search(title or ""))
 
 
-def fetch_text(url: str) -> str:
-    """
-    نصّ الصفحة بلا وسوم. يعيد "" عند الفشل - صفحة متعذّرة لا تُسقط جولة.
-
-    الحذف يشمل script وstyle وnav وfooter: قوائم التنقّل تتكرر في كل
-    صفحة وتزاحم الجدول الحقيقي على الحدّ المسموح.
-    """
+def fetch_html(url: str) -> str:
+    """HTML خام. يعيد "" عند الفشل - صفحة متعذّرة لا تُسقط جولة."""
     try:
         req = urllib.request.Request(url, headers={"User-Agent": _UA})
         with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
             ctype = (r.headers.get("Content-Type") or "").lower()
             if "html" not in ctype and "text" not in ctype:
                 return ""
-            html = r.read(600_000).decode("utf-8", "replace")
+            return r.read(600_000).decode("utf-8", "replace")
     except Exception:
         return ""
 
-    html = re.sub(r"(?is)<(script|style|nav|footer|header|svg)[^>]*>.*?</\1>",
-                  " ", html)
-    text = re.sub(r"(?s)<[^>]+>", " ", html)
-    return re.sub(r"\s+", " ", text).strip()
+
+_STRIP = re.compile(
+    r"<(script|style|nav|footer|header|svg)" r"\b[^>]*>.*?</\1>",
+    re.I | re.S)
+
+
+def to_text(html: str) -> str:
+    """نصّ الصفحة بلا وسوم.
+
+    الحذف يشمل script وstyle وnav وfooter: قوائم التنقّل تتكرر في كل
+    صفحة وتزاحم الجدول الحقيقي على الحدّ المسموح.
+    """
+    if not html:
+        return ""
+    html = re.sub(_STRIP, " ", html)
+    return re.sub(r"\s+", " ", re.sub(r"(?s)<[^>]+>", " ", html)).strip()
+
+
+# ما يدلّ على رابط مناقصة مفردة لا صفحة تصفّح
+_LINK = re.compile(
+    r"(tender|bid|rfp|rfq|procure|auction|announce|"
+    r"مناقص|عطاء|اعلان|إعلان)", re.I)
+
+# ما يُستبعد: تصفّح وتصفية وحسابات.
+# القائمة أطول ممّا يبدو ضرورياً لأن الفهارس تبني تصفيتها بروابط تحمل
+# كلمة tender نفسها: /saudi-tenders-directory/type و/location و/announcer.
+# فحصٌ فعلي أعاد ثمانية "روابط مناقصات" كلها صفحات تصفية.
+_NOISE = re.compile(
+    r"(login|signin|register|account|cart|filter|sort|page=|"
+    r"/type/?$|/location/?$|/announcer/?$|/category|/directory/?$|"
+    r"/archive|/search|/tag/|/author/|reels|"
+    r"facebook|twitter|whatsapp|mailto:|tel:|\.(jpg|png|pdf|zip)$)", re.I)
+
+# رابط مناقصة مفردة يحمل معرّفاً: رقم أو عنوان طويل - لا مسار تصنيف
+_SPECIFIC = re.compile(r"(\d{4,}|[/-][a-z؀-ۿ-]{18,})", re.I)
+
+
+def tender_links(html: str, base: str, limit: int = 8) -> list[str]:
+    """
+    روابط المناقصات المفردة داخل صفحة فهرس.
+
+    نفس النطاق فقط: الفهرس يحيل إلى مواقع خارجية كثيرة (إعلانات، شركاء)
+    وفتحها إهدار. والترتيب ترتيب ورودها - أعلى الجدول أحدث عادةً.
+    """
+    from urllib.parse import urljoin, urlparse
+
+    host = urlparse(base).netloc.lower()
+    out, seen = [], set()
+    for m in re.finditer(r"<a[^>]+href=(\"[^\"]*\"|'[^']*')", html, re.I):
+        href = m.group(1).strip("\"'")
+        if not href or href.startswith(("#", "javascript:")):
+            continue
+        full = urljoin(base, href)
+        if urlparse(full).netloc.lower() != host:
+            continue
+        if _NOISE.search(full) or not _LINK.search(full):
+            continue
+        if not _SPECIFIC.search(full):
+            continue
+        if full in seen or full.rstrip("/") == base.rstrip("/"):
+            continue
+        seen.add(full)
+        out.append(full)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def fetch_text(url: str) -> str:
+    """نصّ الصفحة - جلبٌ ثم تجريد. يعيد "" عند الفشل."""
+    return to_text(fetch_html(url))
 
 
 def _heavy(url: str) -> str:

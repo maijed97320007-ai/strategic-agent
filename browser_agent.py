@@ -22,18 +22,54 @@ BROWSER_TIMEOUT = int(os.getenv("BROWSER_TIMEOUT", "180"))
 def _llm():
     """
     browser-use يريد عميل نموذج خاصاً به، لا كائن crewai.
-    نمرّر نفس مفتاح OpenRouter عبر واجهة OpenAI المتوافقة.
+
+    المزوّد من الموجّه لا من MODEL مباشرةً: بعد أن أُفرغ MODEL ليقرّر
+    التوجيه، كان هذا يسقط على OPENAI_API_KEY غير الموجود فيفشل الوكيل
+    ستّ مرات متتالية ويعيد «لم يُستخرج شيء» - عطل صامت سببه إعدادٌ في
+    مكان آخر.
+
+    كلّهم متوافقون مع واجهة OpenAI، فالفرق عنوانٌ ومفتاح.
     """
     from browser_use import ChatOpenAI
 
-    model = os.getenv("MODEL", "openrouter/minimax/minimax-m3:free")
-    if model.startswith("openrouter/"):
-        return ChatOpenAI(
-            model=model.removeprefix("openrouter/"),
-            api_key=os.getenv("OPENROUTER_API_KEY"),
-            base_url="https://openrouter.ai/api/v1",
-        )
-    return ChatOpenAI(model=model.split("/")[-1], api_key=os.getenv("OPENAI_API_KEY"))
+    forced = (os.getenv("MODEL") or "").strip()
+    if forced:
+        name = forced.split("/")[0]
+    else:
+        name = ""
+
+    # ترتيب خاص بهذا الوكيل: browser_use يرسل frequency_penalty في كل
+    # نداء، وواجهة Gemini المتوافقة مع OpenAI ترفض الحقل بـ400
+    # «Unknown name frequency_penalty» فيفشل الوكيل ستّ مرات ويعيد «لم
+    # يُستخرج شيء». المزوّدون أدناه يقبلون مجموعة معاملات OpenAI كاملة.
+    FULL_OPENAI = ("openrouter", "groq", "cerebras", "mistral", "zai")
+
+    try:
+        import providers
+        ready = [p for p in providers.available()
+                 if p.name in FULL_OPENAI] or \
+                [p for p in providers.available() if p.name != "ollama"]
+        if forced:
+            pick = providers.by_name(name) or (ready[0] if ready else None)
+            model_id = forced.split("/", 1)[1] if "/" in forced else forced
+        elif ready:
+            pick = ready[0]
+            model_id = (pick.model_for(providers.FAST) or "").split("/")[-1]
+        else:
+            pick = None
+            model_id = ""
+        if pick and model_id and os.getenv(pick.key_env):
+            return ChatOpenAI(model=model_id,
+                              api_key=os.getenv(pick.key_env),
+                              base_url=pick.base_url)
+    except Exception:
+        pass
+
+    # احتياط أخير: OpenRouter إن كان مفتاحه موجوداً
+    if key := os.getenv("OPENROUTER_API_KEY"):
+        return ChatOpenAI(model="minimax/minimax-m3:free", api_key=key,
+                          base_url="https://openrouter.ai/api/v1")
+    raise RuntimeError("لا مزوّد جاهز لوكيل التصفح - أضف مفتاحاً في .env")
 
 
 def visit(task: str, timeout: int | None = None) -> str:
