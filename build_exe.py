@@ -37,6 +37,10 @@ HIDDEN = [
     "instructor", "litellm", "pydantic", "pydantic.deprecated.decorator",
     "opentelemetry.sdk", "json_repair",
     "rich", "markdown_it",
+    # وكيل التصفح: يُستورد كسولاً داخل الدوال فلا يراه التحليل الساكن،
+    # وبدونه يسقط قارئ فهارس المناقصات صامتاً في النسخة المبنيّة.
+    # كلفته 7 ميجابايت ولا يحمل متصفحاً - يقود المثبَّت على الجهاز.
+    "browser_use", "cdp_use", "bubus", "uuid_extensions",
     "webview", "webview.platforms.edgechromium", "clr_loader", "pythonnet",
     "uvicorn", "uvicorn.logging", "uvicorn.protocols",
     "uvicorn.protocols.http.auto", "uvicorn.protocols.websockets.auto",
@@ -65,7 +69,8 @@ def local_modules() -> list[str]:
 
 # ملفات بيانات لا تُجمع تلقائياً
 COLLECT = ["crewai", "crewai_tools", "chromadb", "tiktoken_ext", "litellm",
-           "webview"]   # pywebview يحمّل واجهاته الخلفية ديناميكياً
+           "webview",   # pywebview يحمّل واجهاته الخلفية ديناميكياً
+           "browser_use"]   # قوالب ومُوجَّهات داخل الحزمة
 
 
 def kill_running() -> int:
