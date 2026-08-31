@@ -38,6 +38,22 @@ SKIP = re.compile(r"(instagram|facebook|twitter|x\.com|linkedin|tiktok|"
 
 MAX_PAGES = int(os.getenv("PORTAL_PAGES", "6"))
 MIN_TEXT = 800          # أقل من هذا يعني صفحة لم تُخدَّم من الخادم
+
+# المعيار عبارة الموعد لا التاريخ المجرّد: قوائم التصفية في الفهارس
+# مليئة بالسنوات والتواريخ - قياسٌ على arabtender أعطى ثمانية عشر
+# تاريخاً كلها في قوائم منسدلة وصفر عبارة موعد. والموعد هو ما نريده.
+# arabtender مثال حيّ: الجلب الرخيص يعيد 3,657 حرفاً كلها فلاتر وقوائم،
+# والجدول نفسه يُبنى بجافاسكربت. الوكيل قرأه في 97 ثانية واستخرج ستّ
+# مناقصات بمواعيد إغلاقها - وهذا ما لا يعوّضه استعلامٌ آخر.
+_ROWS = re.compile(
+    "آخر موعد|الموعد النهائي|تاريخ الإقفال|موعد الإقفال|"
+    "آخر أجل|تاريخ الفتح|deadline|closing date|submission date",
+    re.I)
+MIN_ROWS = 2
+
+# ميزانية الوكيل الثقيل: صفحتان لكل جولة. كل واحدة ~100 ثانية، وثلاث
+# منها تتجاوز زمن الجولة كلها.
+HEAVY_BUDGET = int(os.getenv("PORTAL_HEAVY", "2"))
 KEEP = 4000             # ما يُمرَّر للمصنّف من كل صفحة
 TIMEOUT = int(os.getenv("PORTAL_TIMEOUT", "20"))
 
@@ -175,10 +191,18 @@ def expand(events, limit: int | None = None, workers: int = 4) -> dict[str, str]
     with ThreadPoolExecutor(max_workers=workers) as pool:
         pages = dict(zip(urls, pool.map(fetch_text, urls)))
 
-    # الثقيل للعاجز عنه الرخيص فقط
+    # الثقيل للعاجز عنه الرخيص فقط، وبميزانية.
+    #
+    # المعيار ليس طول النصّ بل وجود صفوف: صفحة تعيد أربعة آلاف حرف من
+    # الفلاتر تجتاز اختبار الطول وهي خالية من المناقصات تماماً.
+    budget = HEAVY_BUDGET
     for u, t in list(pages.items()):
-        if len(t) < MIN_TEXT:
-            pages[u] = _heavy(u) or t
+        thin = len(t) < MIN_TEXT
+        rowless = len(_ROWS.findall(t)) < MIN_ROWS
+        if (thin or rowless) and budget > 0:
+            if got := _heavy(u):
+                pages[u] = got
+                budget -= 1
 
     return {u: t[:KEEP] for u, t in pages.items() if len(t) >= MIN_TEXT}
 
