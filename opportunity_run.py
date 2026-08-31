@@ -134,6 +134,9 @@ CLASSIFY_BRIEF = """أنت محلل فرص. أمامك ملف شركة وقائ�
 - `deadline` من نصّ الخبر حرفياً لا تقديراً. إن ذُكر «خلال أسبوعين» أو
   «نهاية الشهر» فاحسبه من تاريخ اليوم {today}. وإن لم يُذكر موعد إطلاقاً
   فاتركه فارغاً - موعدٌ مخترع أسوأ من غيابه لأنه يُبنى عليه قرار.
+- بعض المدخلات فهارس تحمل «محتوى الصفحة»: عدة مناقصات في نصّ واحد.
+  استخرج منها **كل مناقصة مطابقة كعنصر مستقل** بعنوانها وجهتها وموعدها،
+  ولا تُدرج الفهرس نفسه كفرصة. معرّف المصدر واحد لها جميعاً.
 - إن لم تكن فرصة حقيقية لهذه الشركة، لا تُدرجها إطلاقاً."""
 
 
@@ -160,8 +163,26 @@ def detect(profile: dict | None = None, extra_queries: list[str] | None = None,
     agents = main.build_agents()
     mk = agents.get("_rebuild")
     prof_txt = json.dumps(profile, ensure_ascii=False, indent=1)[:2500]
-    items_txt = "\n".join(
-        f"[{e.source_id}] {e.title}\n     {e.description[:200]}" for e in raw[:40])
+    ranked = _rank_events(raw)
+
+    # فتح صفحات الفهارس. المقتطف يقول «موقع فيه مناقصات»، والصفحة نفسها
+    # تقول «هذه المناقصة تغلق بعد 23 يوماً» - وهذا الفرق هو سبب أن 243
+    # خبراً كانت تُنتج فرصتين.
+    pages: dict[str, str] = {}
+    try:
+        import portals
+        pages = portals.expand(ranked)
+        if pages:
+            stage(f"فُتحت {len(pages)} صفحة فهرس")
+    except Exception as e:
+        stage(f"تعذّر فتح الفهارس: {type(e).__name__}")
+
+    def _block(e) -> str:
+        head = f"[{e.source_id}] {e.title}\n     {e.description[:200]}"
+        body = pages.get(e.url or "")
+        return head + (f"\n     ── محتوى الصفحة ──\n     {body}" if body else "")
+
+    items_txt = "\n".join(_block(e) for e in ranked[:CLASSIFY_CAP])
 
     stage("تصنيف ومطابقة مع ملف شركتك...")
     raw_out = pipeline._run_one(
