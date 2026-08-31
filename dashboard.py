@@ -150,7 +150,12 @@ def render(d: dict) -> str:
         out += ["", f"  رادار الفرص  ({', '.join(f'{k} {v}' for k, v in bands.items())})",
                 "  " + "-" * 56]
         for o in opp[:8]:
-            out.append(f"   [{o['score']:3d}] {o['band']:<11} {o['title'][:44]}")
+            left = o.get("days_left")
+            when = ("" if left is None else
+                    " ⏳ اليوم" if left == 0 else
+                    f" ⏳ {left}ي" if left > 0 else f" ✗ -{-left}ي")
+            out.append(f"   [{o['score']:3d}] {o['band']:<11} "
+                       f"{o['title'][:38]}{when}")
             for s in (o.get("sources") or [])[:2]:
                 w = f"{s['weight']:.2f}" if s.get("weight") is not None else " —  "
                 out.append(f"          {w}  {s.get('site') or s['url'][:46]}")

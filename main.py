@@ -77,6 +77,9 @@ RUN_TIMEOUT = int(os.getenv("RUN_TIMEOUT", "1500"))
 AGENT_MAX_TOKENS = int(os.getenv("AGENT_MAX_TOKENS", "3500"))
 SYNTH_MAX_TOKENS = int(os.getenv("SYNTH_MAX_TOKENS", "9000"))
 
+# مصنّف الفرص يُنتج عنصراً منظّماً لكل خبر مطابق - مخرَج طويل بطبعه
+OPP_MAX_TOKENS = int(os.getenv("OPP_MAX_TOKENS", "8000"))
+
 # صفر افتراضاً: التقرير يُعرض في الصفحة نفسها الآن، وتوليد PDF يشغّل
 # Edge بلا واجهة ويضيف ثوانيَ لكل تشغيلة لملفٍ قد لا يُفتح. زرّ «تصدير
 # PDF» في بطاقة النتيجة يولّده عند الطلب.
@@ -452,14 +455,26 @@ def build_agents() -> dict:
         "مصدره، ويكتب (تقدير) صراحة بجانب ما لا سند له.", 0.45, providers.BROAD)
     agents["SYN"].llm.max_tokens = SYNTH_MAX_TOKENS
 
+    # مصنّف الفرص: كان يستعير A1 المخصّص للاستخراج القصير - نموذج خفيف
+    # وسقف 3500 رمز. لكن تصنيف تسعين خبراً بمخرَج JSON منظّم لكل واحد
+    # مهمة طويلة لا قصيرة، فكان المخرَج يُبتر عند العنصر الأول أو الثاني
+    # ويعود بفرصة واحدة من مئتين وثلاثة وأربعين خبراً.
+    agents["OPP"] = make(
+        "محلّل الفرص",
+        "فرز الأخبار وتحديد ما يفتح باب عمل لهذا الملف تحديداً",
+        "يقرأ عشرات الأخبار ويميّز المناقصة الحقيقية من الخبر العام. "
+        "لا يجامل: ما لا يفتح باب عمل لا يُدرجه.",
+        0.3, providers.BROAD)
+    agents["OPP"].llm.max_tokens = OPP_MAX_TOKENS
+
     # مصنع لإعادة البناء بمزوّد بديل عند فشل الأول
     def rebuild(code: str):
         spec = next((r for r in pipeline.ROSTER if r[0] == code), None)
-        if code in ("SYN", "RED"):
-            kind = providers.BROAD if code == "SYN" else providers.ANALYTIC
+        if code in ("SYN", "RED", "OPP"):
+            kind = providers.ANALYTIC if code == "RED" else providers.BROAD
+            temp = {"SYN": 0.45, "RED": 0.35, "OPP": 0.3}[code]
             return lambda n: make(agents[code].role, agents[code].goal,
-                                  agents[code].backstory,
-                                  0.45 if code == "SYN" else 0.35, kind,
+                                  agents[code].backstory, temp, kind,
                                   attempt=n, spread=SPREAD.get(code, 0))
         if not spec:
             return None

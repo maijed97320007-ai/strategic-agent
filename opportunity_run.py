@@ -7,13 +7,71 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 import sys
 
 # المسار المطلق من opportunity: السلسلة النسبية تُحلّ حسب مجلد التشغيل،
 # فتشغيل الـEXE من مجلد آخر يفتح قاعدة فارغة بصمت.
+from datetime import date, datetime
+
 from opportunity import _DB
 from opportunity import (EVENT_TYPES, INVESTIGATE, WATCH, Event, Scored,
                          _db, _now, band_of, collect, load_profile, score_one)
+
+# كم خبراً يرى المصنّف. كان أربعين بينما الجولة تجمع 243 - أي أن 83%
+# منها لم تُقرأ أصلاً. سياق Gemini مليون رمز فالسقف لم يعد قيداً تقنياً.
+CLASSIFY_CAP = int(os.getenv("CLASSIFY_CAP", "90"))
+
+# ما يدلّ على مناقصة أو مشروع، لا خبراً عاماً
+_TENDER = re.compile(
+    r"مناقص|عطاء|كراسة|ترسي|طرح|إعلان|توريد|تنفيذ|إنشاء|"
+    r"tender|bid|rfp|rfq|procurement|awarded|contract|"
+    r"appel d.offres|march[ée] public", re.I)
+
+
+def _rank_events(events: list) -> list:
+    """
+    يرتّب الأخبار قبل عرضها على المصنّف.
+
+    السبب: الجولة تجمع مئات الأخبار والمصنّف يرى أوائلها فقط، وترتيب
+    الجمع هو ترتيب الاستعلامات لا ترتيب الأهمية - فتصدّرت أخبارٌ عامة
+    وضاعت مناقصات في الذيل. جولة جمعت 243 خبراً أنتجت فرصتين.
+
+    الترجيح بسيط ومكشوف: كلمة تدلّ على مناقصة في العنوان تعلو، ووجود
+    تاريخ يعلو، والوصف الفارغ يهبط. لا نموذج هنا - الترتيب قرار كود.
+    """
+    def rank(e) -> tuple:
+        title = e.title or ""
+        return (
+            -2 if _TENDER.search(title) else 0,
+            -1 if _TENDER.search(e.description or "") else 0,
+            -1 if (e.event_date or "").strip() else 0,
+            0 if (e.description or "").strip() else 1,
+        )
+
+    return sorted(events, key=rank)
+
+
+def _clean_deadline(raw) -> str:
+    """
+    يقبل YYYY-MM-DD فقط ويرفض ما عداه.
+
+    النموذج يكتب أحياناً «قريباً» أو «غير محدد» أو تاريخاً بصيغة أخرى،
+    وتخزينها كما هي يجعل حساب الأيام المتبقية مستحيلاً ويُظهر نصّاً
+    عشوائياً مكان الموعد. الرفض أنظف من التخمين.
+    """
+    t = str(raw or "").strip()
+    if not t:
+        return ""
+    try:
+        d = date.fromisoformat(t[:10])
+    except ValueError:
+        return ""
+    # موعد في الماضي البعيد أو المستقبل البعيد = هلوسة لا استخراج
+    delta = (d - date.today()).days
+    return d.isoformat() if -365 < delta < 730 else ""
+
 
 OPP_RED_BRIEF = """أنت الفريق الأحمر. أمامك فرص صُنّفت عالية لهذه الشركة.
 
@@ -61,6 +119,7 @@ CLASSIFY_BRIEF = """أنت محلل فرص. أمامك ملف شركة وقائ�
     "event_type": "أحد الأنواع أعلاه",
     "company": "الجهة صاحبة الحدث إن ذُكرت وإلا فارغ",
     "location": "الموقع إن ذُكر وإلا فارغ",
+    "deadline": "آخر موعد للتقديم بصيغة YYYY-MM-DD إن ذُكر، وإلا فارغ",
     "fit": 0-100, "market": 0-100, "timing": 0-100, "profit": 0-100,
     "competition": 0-100, "risk": 0-100, "score": 0-100,
     "evidence": ["S1"],
@@ -72,6 +131,9 @@ CLASSIFY_BRIEF = """أنت محلل فرص. أمامك ملف شركة وقائ�
 - `fit` ملاءمة قدرات الشركة تحديداً، لا جاذبية المشروع عموماً.
 - `competition` و`risk`: الأعلى أسوأ (100 = منافسة خانقة أو خطر عالٍ).
 - `evidence` معرّفات من الأخبار أعلاه حصراً - لا تخترع معرّفاً.
+- `deadline` من نصّ الخبر حرفياً لا تقديراً. إن ذُكر «خلال أسبوعين» أو
+  «نهاية الشهر» فاحسبه من تاريخ اليوم {today}. وإن لم يُذكر موعد إطلاقاً
+  فاتركه فارغاً - موعدٌ مخترع أسوأ من غيابه لأنه يُبنى عليه قرار.
 - إن لم تكن فرصة حقيقية لهذه الشركة، لا تُدرجها إطلاقاً."""
 
 
@@ -103,10 +165,11 @@ def detect(profile: dict | None = None, extra_queries: list[str] | None = None,
 
     stage("تصنيف ومطابقة مع ملف شركتك...")
     raw_out = pipeline._run_one(
-        "OPP", agents["A1"],
+        "OPP", agents["OPP"],
         CLASSIFY_BRIEF.format(profile=prof_txt, items=items_txt,
-                              types="، ".join(EVENT_TYPES)),
-        mk("A1") if mk else None)
+                              types="، ".join(EVENT_TYPES),
+                              today=date.today().isoformat()),
+        mk("OPP") if mk else None)
 
     parsed = pipeline.parse_items(raw_out, "OPP", reg)
     if not parsed:
@@ -131,7 +194,8 @@ def detect(profile: dict | None = None, extra_queries: list[str] | None = None,
                    url=src.url if src else "")
         scored.append(Scored(event=ev, score=total, band=band_of(total),
                              factors=factors, evidence=it.evidence,
-                             why=it.detail, action=str(d.get("action", ""))))
+                             why=it.detail, action=str(d.get("action", "")),
+                             deadline=_clean_deadline(d.get("deadline"))))
 
     scored.sort(key=lambda s: -s.score)
 
@@ -174,11 +238,12 @@ def persist(scored: list[Scored], db: str = _DB) -> None:
                           (e.ext_id,)).fetchone()
         con.execute(
             "INSERT INTO opportunities(event_id,title,score,band,factors,"
-            "evidence,why,action,red_team,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            "evidence,why,action,red_team,deadline,created_at)"
+            " VALUES(?,?,?,?,?,?,?,?,?,?,?)",
             (row["id"] if row else None, e.title, s.score, s.band,
              json.dumps(s.factors, ensure_ascii=False),
              json.dumps(s.evidence, ensure_ascii=False),
-             s.why, s.action, s.red_team, _now()))
+             s.why, s.action, s.red_team, s.deadline, _now()))
     con.commit()
     con.close()
 
@@ -215,13 +280,21 @@ def _source_map(con) -> dict[str, list[dict]]:
     return out
 
 
-def recent(limit: int = 20, min_score: int = 0, db: str = _DB) -> list[dict]:
+def recent(limit: int = 20, min_score: int = 0, db: str = _DB,
+           include_expired: bool = False) -> list[dict]:
+    """
+    الفرص المرصودة، الأحدث والأعلى درجةً أولاً.
+
+    المنتهية مُستبعَدة افتراضاً: مناقصة أُغلق بابها ليست فرصة، ووجودها
+    في الرادار يزاحم الحيّ على انتباهك. `include_expired` يعيدها لمن
+    أراد المراجعة.
+    """
     con = _db(db)
     rows = con.execute(
         "SELECT o.*, e.url, e.company, e.location, e.event_type, e.source_id"
         " FROM opportunities o LEFT JOIN events e ON e.id=o.event_id"
         " WHERE o.score>=? ORDER BY o.score DESC, o.created_at DESC LIMIT ?",
-        (min_score, limit)).fetchall()
+        (min_score, limit * 3)).fetchall()
     smap = _source_map(con)
     con.close()
 
@@ -254,8 +327,23 @@ def recent(limit: int = 20, min_score: int = 0, db: str = _DB) -> list[dict]:
                     seen.add(s["url"])
                     srcs.append(s)
 
+        # الأيام المتبقية: رقم يُقرأ أسرع من تاريخ يحتاج طرحاً ذهنياً
+        d["days_left"] = None
+        d["expired"] = False
+        if dl := (d.get("deadline") or "").strip():
+            try:
+                d["days_left"] = (date.fromisoformat(dl) - date.today()).days
+                d["expired"] = d["days_left"] < 0
+            except ValueError:
+                d["deadline"] = ""
+
+        if d["expired"] and not include_expired:
+            continue
+
         d["sources"] = srcs
         out.append(d)
+        if len(out) >= limit:
+            break
     return out
 
 

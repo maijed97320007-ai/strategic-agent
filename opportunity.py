@@ -44,6 +44,12 @@ HIGH, INVESTIGATE, WATCH = 85, 70, 50
 DEFAULT_REGIONS = ("الخليج", "السعودية", "الإمارات", "قطر", "الكويت",
                    "شمال أفريقيا", "مصر", "الأردن")
 
+# نافذة الحداثة. مناقصة أُغلقت قبل شهور ليست فرصة بل ضجيج يزاحم الجديد
+# على انتباهك. Serper يقبل tbs=qdr:m (شهر) وqdr:w (أسبوع) وqdr:d (يوم)،
+# وقياس فعلي: البحث بلا تصفية أعاد نتيجة من ديسمبر 2024 في الصف الثاني،
+# وبـqdr:m صار أحدثها «قبل أربعة أيام».
+RADAR_WINDOW = os.getenv("RADAR_WINDOW", "qdr:m").strip()
+
 # صلاحية ذاكرة الرادار. أطول من الافتراضي (6) عمداً: المناقصة تبقى
 # مفتوحة أسابيع، والجولة كل ست ساعات بـ33 استعلاماً تستنزف الحصة
 # المجانية في تسعة عشر يوماً. بـ24 ساعة تُنفَّذ جولة حقيقية من كل أربع.
@@ -101,6 +107,7 @@ CREATE TABLE IF NOT EXISTS opportunities (
     action      TEXT,
     red_team    TEXT,
     status      TEXT NOT NULL DEFAULT 'new',
+    deadline    TEXT,
     created_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_op_score ON opportunities(score DESC);
@@ -111,6 +118,13 @@ def _db(path: str = _DB) -> sqlite3.Connection:
     con = sqlite3.connect(path)
     con.row_factory = sqlite3.Row
     con.executescript(_SCHEMA)
+
+    # هجرة صامتة: CREATE TABLE IF NOT EXISTS لا يضيف عموداً لجدول قائم،
+    # فقاعدة أُنشئت قبل حقل الموعد تبقى بلا العمود ويسقط الإدراج.
+    cols = {r[1] for r in con.execute("PRAGMA table_info(opportunities)")}
+    if "deadline" not in cols:
+        con.execute("ALTER TABLE opportunities ADD COLUMN deadline TEXT")
+
     con.commit()
     return con
 
@@ -151,6 +165,7 @@ class Scored:
     why: str = ""
     action: str = ""
     red_team: str = ""
+    deadline: str = ""          # ISO إن أمكن، وإلا النصّ كما ورد
 
 
 # ======================
@@ -223,13 +238,28 @@ def collect(profile: dict, extra_queries: list[str] | None = None,
             queries.append(f"appel d'offres dessalement eau {c} {year}")
 
     import cache
+    from concurrent.futures import ThreadPoolExecutor
 
-    for q in queries:
-        res = cache.cached_search(tool, q, ttl_hours=RADAR_TTL)
+    # ثلاثة وثلاثون استعلاماً تسلسلياً كلّفت ثمانياً وعشرين دقيقة مقيسة،
+    # وكلها انتظار شبكة. ستة خيوط لا أكثر: Serper يخنق التزامن العالي
+    # فيصير التسريع تباطؤاً بإعادة المحاولة.
+    def fetch(q: str):
+        # المفتاح يحمل النافذة: نتائج الشهر ونتائج الأسبوع ليست واحدة
+        key = f"{q} ⟨{RADAR_WINDOW}⟩" if RADAR_WINDOW else q
+        res = cache.get(key, ttl_hours=RADAR_TTL)
+        if res is None:
+            res = _serper(q, RADAR_WINDOW, per_query)
+            if res is not None:
+                cache.put(key, res)
+        return q, res
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        results = list(pool.map(fetch, queries))
+
+    for q, res in results:
         if res is None:
             continue
-        organic = (res or {}).get("organic", []) if isinstance(res, dict) else []
-        for it in organic[:per_query]:
+        for it in (res.get("organic") or [])[:per_query]:
             if not it.get("link"):
                 continue
             src = reg.add(it.get("title", ""), it["link"], it.get("snippet", ""), q)
@@ -238,6 +268,42 @@ def collect(profile: dict, extra_queries: list[str] | None = None,
                              url=it["link"], source_id=src.id,
                              event_date=str(it.get("date", ""))))
     return reg, raw
+
+
+def _serper(query: str, tbs: str = "", num: int = 10) -> dict | None:
+    """
+    نداء Serper مباشر - لا عبر أداة crewai.
+
+    السبب أن SerperDevTool لا تُمرّر `tbs`، وهي المعامل الوحيد الذي يصفّي
+    بالحداثة. وبدونه يعيد البحث مناقصات أُغلقت قبل سنتين بين الجديدة،
+    فيصير الرادار أرشيفاً لا رادراً.
+    """
+    key = os.getenv("SERPER_API_KEY")
+    if not key:
+        # هذه الوحدة تُستورد أحياناً وحدها (اختبار، أداة تشخيص) قبل أن
+        # يحمّل main ملف .env، فتبدو بلا مفتاح وهو موجود.
+        try:
+            from main import app_dir
+            from dotenv import load_dotenv
+            load_dotenv(app_dir() / ".env")
+            key = os.getenv("SERPER_API_KEY")
+        except Exception:
+            pass
+    if not key:
+        return None
+    body = {"q": query, "num": num}
+    if tbs:
+        body["tbs"] = tbs
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            "https://google.serper.dev/search",
+            data=json.dumps(body).encode("utf-8"),
+            headers={"X-API-KEY": key, "Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=25) as r:
+            return json.loads(r.read().decode("utf-8", "replace"))
+    except Exception:
+        return None            # تعثّر استعلام لا يُسقط الجولة
 
 
 # ======================

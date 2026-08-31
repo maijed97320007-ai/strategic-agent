@@ -46,9 +46,16 @@ def _opportunities(a: dict) -> str:
         return "لا فرص مرصودة بعد. شغّل «كشف الفرص» ليملأ الرادار."
     out = []
     for r in rows:
-        out.append(f"[{r['score']:>3}] {r['band']:<7} {r['title']}")
+        left = r.get("days_left")
+        when = ("" if left is None else
+                f"  ⏳ ينتهي اليوم" if left == 0 else
+                f"  ⏳ بقي {left} يوم" if left > 0 else
+                f"  ✗ انتهى منذ {-left} يوم")
+        out.append(f"[{r['score']:>3}] {r['band']:<7} {r['title']}{when}")
         meta = " · ".join(x for x in (r.get("company"), r.get("location"),
-                                      r.get("event_type")) if x)
+                                      r.get("event_type"),
+                                      f"آخر موعد {r['deadline']}"
+                                      if r.get("deadline") else "") if x)
         if meta:
             out.append(f"        {meta}")
         if r.get("action"):

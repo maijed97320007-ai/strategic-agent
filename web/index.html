@@ -1181,6 +1181,12 @@ function renderDash(d) {
   }
   out.push(opps.length ? `<ul class="opps">` + opps.slice(0, 12).map(o => {
     const meta = [o.company, o.location, o.event_type].filter(Boolean).join(" · ");
+    // الأيام المتبقية أهمّ من التاريخ نفسه: الرقم يُقرأ بلا طرح ذهني،
+    // ولونه يقول الإلحاح قبل قراءته.
+    const n = o.days_left;
+    const due = n == null ? "" :
+      `<span class="due ${n <= 3 ? "hot" : n <= 10 ? "soon" : ""}">
+         ${icon("clock", "i-sm")}${n === 0 ? "ينتهي اليوم" : `بقي ${n} يوم`}</span>`;
     const title = o.url
       ? `<a class="t" href="${esc(o.url)}" target="_blank" rel="noopener">${esc(o.title)}</a>`
       : `<div class="t">${esc(o.title)}</div>`;
@@ -1194,7 +1200,7 @@ function renderDash(d) {
     const band = o.band === "HIGH" || o.band === "INVESTIGATE" ? "badge-success"
                : o.band === "WATCH" ? "badge-outline" : "badge-secondary";
     return `<li class="card"><span class="score">${esc(o.score)}</span>
-      <span class="badge ${band}">${esc(o.band)}</span>
+      <span class="badge ${band}">${esc(o.band)}</span>${due}
       <span class="opp-body">${title}<div class="m">${esc(meta || o.why || "")}</div>
       ${srcs ? `<div class="srcs">${srcs}</div>`
              : `<div class="srcs"><span class="src lo">بلا مصدر موثّق</span></div>`}
