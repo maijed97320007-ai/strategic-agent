@@ -31,16 +31,21 @@ import crm
 # أسماء الأعمدة المحتملة لكل حقل، عربيةً وإنجليزيةً.
 # الترتيب مهم: الأدقّ أولاً كي لا يلتقط "اسم" عمودَ اسم الشخص للشركة.
 FIELDS: dict[str, tuple[str, ...]] = {
+    # "title" هنا لا في role: تصديرات خرائط جوجل تسمّي اسم المنشأة
+    # `title`، وملف أذربيجان الأول ربطه بالمنصب فسقطت 268 صفاً كلها.
+    # وفي تصدير CRM حقيقي يوجد عمود company صريح فيفوز بالمطابقة التامة
+    # ويبقى title للمنصب - الترتيب يحلّ الحالتين بلا تعارض.
     "company": ("اسم الشركة", "اسم الجهة", "الجهة", "الشركة", "المؤسسة",
                 "العميل", "company", "company name", "account", "organization",
-                "organisation", "client", "customer", "vendor", "entity"),
+                "organisation", "client", "customer", "vendor", "entity",
+                "title", "business", "business name", "place", "place name"),
     "contact": ("اسم المسؤول", "الشخص", "جهة الاتصال", "المسؤول", "الاسم",
                 "contact", "contact name", "person", "full name", "name"),
     "role":    ("المنصب", "الوظيفة", "الصفة", "role", "title", "position",
                 "job title"),
     "email":   ("البريد", "الايميل", "الإيميل", "البريد الالكتروني",
-                "البريد الإلكتروني", "email", "e-mail", "mail",
-                "email address"),
+                "البريد الإلكتروني", "email", "emails", "e-mail", "mail",
+                "email address", "e mail"),
     "phone":   ("الهاتف", "الجوال", "رقم الهاتف", "التلفون", "phone",
                 "mobile", "tel", "telephone", "phone number"),
     "sector":  ("القطاع", "المجال", "النشاط", "sector", "industry",
@@ -49,7 +54,10 @@ FIELDS: dict[str, tuple[str, ...]] = {
                 "city", "region"),
     "website": ("الموقع الالكتروني", "الموقع الإلكتروني", "الرابط",
                 "website", "url", "site", "web"),
-    "notes":   ("ملاحظات", "ملاحظة", "notes", "note", "comment", "remarks"),
+    "address": ("العنوان", "عنوان", "address", "complete address",
+                "street", "full address"),
+    "notes":   ("ملاحظات", "ملاحظة", "notes", "note", "comment", "remarks",
+                "description", "descriptions", "about"),
 }
 
 # ترميزات ويندوز العربي الشائعة، بترتيب الاحتمال
@@ -167,12 +175,15 @@ def run(path: str | Path, dry: bool = False, db_path: str = crm.DB) -> dict:
                 stats["problems"].append(f"سطر {i}: بلا اسم جهة")
             continue
 
-        email = _clean(r.get(cols.get("email", ""), ""))
-        if email and not _EMAIL.fullmatch(email):
+        # الخانة قد تحمل أكثر من بريد («pr@x.com, hr@x.com») - نأخذ
+        # الأول الصالح. fullmatch كانت ترفض الخانة كلها فيضيع عنوان سليم.
+        raw_mail = _clean(r.get(cols.get("email", ""), ""))
+        found = _EMAIL.search(raw_mail) if raw_mail else None
+        email = found.group(0) if found else ""
+        if raw_mail and not email:
             # لا نرفض السطر: الاسم صالح والبريد وحده مشكوك فيه
             if len(stats["problems"]) < 10:
-                stats["problems"].append(f"سطر {i}: بريد غير صالح «{email[:40]}»")
-            email = ""
+                stats["problems"].append(f"سطر {i}: بريد غير صالح «{raw_mail[:40]}»")
 
         if dry:
             stats["companies"] += 1
@@ -180,10 +191,11 @@ def run(path: str | Path, dry: bool = False, db_path: str = crm.DB) -> dict:
                 stats["contacts"] += 1
             continue
 
+        addr = _clean(r.get(cols.get("address", ""), ""))
         cid = crm.upsert_company(
             name,
             sector=_clean(r.get(cols.get("sector", ""), "")),
-            country=_clean(r.get(cols.get("country", ""), "")),
+            country=_clean(r.get(cols.get("country", ""), "")) or addr,
             website=_clean(r.get(cols.get("website", ""), "")),
             path=db_path)
         if not cid:
