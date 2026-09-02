@@ -185,6 +185,117 @@ def _detect_opportunities(_a: dict) -> str:
     return _opportunities({"limit": 25})
 
 
+# ======================
+# إدارة العلاقات
+# ======================
+def _crm(_a: dict) -> str:
+    import crm
+    return crm.render()
+
+
+def _crm_companies(a: dict) -> str:
+    import crm
+    q = (a.get("input") or "").strip().lower()
+    rows = crm.companies()
+    if q:
+        rows = [r for r in rows if q in (r["name"] or "").lower()
+                or q in (r.get("sector") or "").lower()
+                or q in (r.get("country") or "").lower()]
+    if not rows:
+        return "لا شركات مطابقة."
+    out = [f"{len(rows)} شركة · رُوسل منها "
+           f"{sum(1 for r in rows if r['contacted'])}", ""]
+    for r in rows[:60]:
+        mark = "✓" if r["contacted"] else " "
+        out.append(f" {mark} #{r['id']:<5} {(r['name'] or '')[:36]:<38} "
+                   f"{r.get('email') or '—'}")
+        meta = " · ".join(x for x in (r.get("sector"), r.get("country")) if x)
+        if meta:
+            out.append(f"          {meta[:70]}")
+    return "\n".join(out)
+
+
+def _crm_due(_a: dict) -> str:
+    import crm
+    rows = crm.due_actions()
+    if not rows:
+        return "لا إجراءات مستحقّة اليوم."
+    out = [f"{len(rows)} إجراء حان موعده", ""]
+    for d in rows:
+        out.append(f"  {d['next_at']}  {d['next_action']}")
+        out.append(f"            {d['title'][:56]}")
+        if d.get("company_name"):
+            out.append(f"            {d['company_name'][:48]}")
+    return "\n".join(out)
+
+
+def _drafts(_a: dict) -> str:
+    import outreach
+    rows = outreach.drafts()
+    if not rows:
+        return ("لا مسودات. أنشئها بخدمة «رسائل تواصل» أو بالأمر:\n"
+                "  python outreach.py batch تشخيص --n=10")
+    out = [f"{len(rows)} مسودة بانتظارك", ""]
+    for m in rows:
+        out.append(f"── #{m['id']}  {m.get('company') or '—'}  "
+                   f"→ {m['to_addr'] or '(بلا بريد)'}")
+        out.append(f"   {m['subject']}")
+        out.append("")
+        out.append("   " + (m["body"] or "").replace("\n", "\n   "))
+        out.append("")
+    return "\n".join(out)
+
+
+def _outreach_batch(a: dict) -> str:
+    import outreach
+    raw = (a.get("input") or "تشخيص").strip()
+    parts = raw.split()
+    angle = parts[0] if parts else "تشخيص"
+    n = 5
+    for x in parts[1:]:
+        if x.isdigit():
+            n = min(20, int(x))
+    if angle not in outreach.ANGLES:
+        rows = "\n  ".join(f"{k} — {v[:56]}"
+                           for k, v in outreach.ANGLES.items())
+        return f"زاوية غير معروفة. المتاح:\n  {rows}"
+    made = outreach.draft_batch(angle=angle, limit=n)
+    if not made:
+        return "لا شركة جديدة ببريد لم تُراسَل بعد."
+    out = [f"{len(made)} مسودة بزاوية «{angle}»", ""]
+    for m in made:
+        out.append(outreach.render(m))
+        out.append("-" * 56)
+    return "\n".join(out)
+
+
+def _zoho(a: dict) -> str:
+    import zoho
+    cmd = (a.get("input") or "").strip().lower()
+    if cmd == "push":
+        import json as _j
+        return _j.dumps(zoho.push_drafts(), ensure_ascii=False, indent=1)
+    if cmd == "sync":
+        import json as _j
+        return _j.dumps(zoho.sync_replies(), ensure_ascii=False, indent=1)
+    return (zoho.setup_hint()
+            + "\n\nاكتب push لرفع المسودات أو sync لقراءة الردود.")
+
+
+def _hunt_deadlines(a: dict) -> str:
+    import deadlines
+    n = int((a.get("input") or "8").strip() or 8)
+    r = deadlines.hunt(limit=min(20, n))
+    if not r["found"]:
+        return f"فُحصت {r['checked']} فرصة ولم يظهر موعد."
+    out = [f"فُحصت {r['checked']} · وُجد {r['found']} موعد", ""]
+    for x in r["results"]:
+        state = f"بقي {x['days_left']} يوم" if x["days_left"] >= 0             else f"انتهى منذ {-x['days_left']} يوم"
+        out.append(f"  {x['deadline']}  ({state})  عبر {x['via']}")
+        out.append(f"      {x['title']}")
+    return "\n".join(out)
+
+
 def _schedule(_a: dict) -> str:
     import scheduler
     return scheduler.render()
@@ -284,6 +395,26 @@ REGISTRY: list[Service] = [
             "ما وفّرته من نداءات بحث مكرّرة", "fast", _cache),
     Service("schedule", "التحديث التلقائي",
             "متى عمل الرادار آخر مرة ومتى يعمل تالياً", "fast", _schedule),
+
+    Service("crm", "لوحة العلاقات",
+            "المسار والصفقات المفتوحة وما حان موعده", "fast", _crm),
+    Service("companies", "قائمة الشركات",
+            "عملاؤك وحالة التواصل · اكتب كلمة للتصفية",
+            "fast", _crm_companies, placeholder="water · Baku · مسقط"),
+    Service("due", "إجراءات مستحقّة",
+            "ما حان موعده اليوم أو فات - يمنع نسيان الصفقة", "fast", _crm_due),
+    Service("drafts", "المسودات الجاهزة",
+            "الرسائل المكتوبة بانتظار مراجعتك", "fast", _drafts),
+    Service("outreach", "كتابة رسائل تواصل",
+            "مسودات لمن لم يُراسَل · اكتب: الزاوية ثم العدد",
+            "slow", _outreach_batch, needs="الزاوية",
+            placeholder="توريد 5   ·   تشخيص 10   ·   تصميم 3"),
+    Service("deadlines", "صيد مواعيد الإغلاق",
+            "يملأ المواعيد الناقصة لأعلى الفرص", "slow", _hunt_deadlines,
+            placeholder="8"),
+    Service("zoho", "Zoho Mail",
+            "رفع المسودات وقراءة الردود · push أو sync",
+            "slow", _zoho, placeholder="push   ·   sync"),
 ]
 
 BY_ID = {s.id: s for s in REGISTRY}
