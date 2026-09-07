@@ -155,7 +155,8 @@ def token() -> str:
     sec = os.getenv("ZOHO_CLIENT_SECRET")
     if not (rt and cid and sec):
         raise RuntimeError(
-            "Zoho غير مُعدّ. الخطوات في رأس zoho.py — أو: python zoho.py setup")
+            "Zoho غير مُعدّ. افتح خدمة «بريد Zoho» في الواجهة"
+            " واتبع الخطوات الأربع — أو من الطرفية: python zoho.py setup")
 
     out = _req(f"{accounts_url()}/oauth/v2/token", "POST", form={
         "grant_type": "refresh_token", "client_id": cid,
