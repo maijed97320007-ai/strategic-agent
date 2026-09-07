@@ -27,6 +27,39 @@ for _s in (sys.stdout, sys.stderr):
         except (ValueError, OSError):
             pass
 
+def _preflight() -> None:
+    """
+    يرفض البناء بمفسّر ينقصه ما نحزمه.
+
+    بايثون النظام لا يملك uvicorn ولا crewai - وهي في .venv. البناء به
+    **ينجح**: PyInstaller لا يشتكي من hidden-import غائب، فيخرج ملف
+    تنفيذي يسقط أول تشغيل بـModuleNotFoundError، بعد أن حُذفت النسخة
+    السليمة. فنفحص هنا، قبل أي حذف.
+    """
+    import importlib.util
+
+    missing = []
+    for m in ("uvicorn", "crewai", "webview"):
+        try:
+            if importlib.util.find_spec(m) is None:
+                missing.append(m)
+        except (ImportError, ValueError):
+            missing.append(m)
+    if not missing:
+        return
+
+    print("مفسّر خاطئ: " + sys.executable)
+    print("  ينقصه: " + "، ".join(missing))
+    venv = ROOT / ".venv" / "Scripts" / "python.exe"
+    if venv.exists():
+        print("\nشغّل بدلاً منه:")
+        print(f'  "{venv}" build_exe.py')
+    sys.exit(1)
+
+
+_preflight()
+
+
 # crewai يحمّل هذه ديناميكياً، فـPyInstaller لا يكتشفها بالتحليل الساكن
 HIDDEN = [
     "crewai", "crewai_tools", "crewai.llms", "crewai.llms.providers",
