@@ -367,6 +367,52 @@ def _zoho(a: dict) -> str:
     return _zoho_status(zoho)
 
 
+def _mail_send(a: dict) -> str:
+    """
+    يفرّغ طابور المسودات إلى Zoho.
+
+    «live» كلمة صريحة لا علم مخفيّ: الفرق بين إيداع مسودة وإرسالٍ لا
+    يُسترجع يجب أن يُكتب باليد في كل مرة.
+    """
+    import mailer
+
+    raw = (a.get("input") or "").strip().lower()
+    parts = raw.split()
+    is_live = "live" in parts or "حي" in parts
+    rate = None
+    n = None
+    for t in parts:
+        if t.startswith("rate="):
+            rate = int(t.split("=", 1)[1] or 0) or None
+        elif t.isdigit():
+            n = int(t)
+
+    if parts and parts[0] in ("budget", "الرصيد"):
+        b = mailer.budget()
+        return (f"اليوم: {b['used']}/{b['cap']}   المتبقّي {b['left']}\n"
+                f"الوضع الافتراضي: {'حيّ' if mailer.live() else 'مسودات'}")
+
+    try:
+        r = mailer.send_batch(limit=n, per_min=rate,
+                              force_live=True if is_live else False)
+    except Exception as e:
+        return f"تعذّر: {e}"
+    return mailer.render(r)
+
+
+def _replies(a: dict) -> str:
+    """يسحب الردود، يصنّفها، ويكتب الأجوبة."""
+    import replies
+
+    parts = (a.get("input") or "").strip().lower().split()
+    is_live = "live" in parts or "حي" in parts
+    n = next((int(t) for t in parts if t.isdigit()), 20)
+    try:
+        return replies.render(replies.handle(limit=n, live=is_live))
+    except Exception as e:
+        return f"تعذّر: {e}"
+
+
 def _hunt_deadlines(a: dict) -> str:
     import deadlines
     n = int((a.get("input") or "8").strip() or 8)
@@ -497,6 +543,13 @@ REGISTRY: list[Service] = [
     Service("deadlines", "صيد مواعيد الإغلاق",
             "يملأ المواعيد الناقصة لأعلى الفرص", "slow", _hunt_deadlines,
             placeholder="8"),
+    Service("mail", "إرسال الدفعة",
+            "يفرّغ المسودات إلى Zoho بإيقاع وسقف يومي",
+            "slow", _mail_send,
+            placeholder="50   ·   live 50   ·   live 100 rate=20   ·   budget"),
+    Service("replies", "قراءة الردود والجواب",
+            "يصنّف الوارد ويكتب الأجوبة · live للإرسال",
+            "slow", _replies, placeholder="20   ·   live 20"),
     Service("zoho", "بريد Zoho",
             "ربط البريد، ورفع المسودات، وقراءة الردود",
             "slow", _zoho,
