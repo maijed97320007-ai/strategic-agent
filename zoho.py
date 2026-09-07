@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import time
 import urllib.parse
@@ -35,9 +36,26 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-DC = (os.getenv("ZOHO_DC") or "com").strip().lstrip(".")
-ACCOUNTS = f"https://accounts.zoho.{DC}"
-API = f"https://mail.zoho.{DC}/api"
+DCS = ("com", "eu", "in", "au", "jp", "sa", "ca")
+
+
+def dc() -> str:
+    """
+    مركز البيانات وقت النداء لا وقت الاستيراد.
+
+    كان يُقرأ في جسم الوحدة، و`python zoho.py` يحمّل .env بعد استيراد
+    الوحدة - فيبقى «com» مهما كتب المستخدم في ZOHO_DC. الخطأ يظهر
+    كـ«رمز غير صالح» لا كـ«مركز خاطئ»، فيُطارَد في المكان الغلط.
+    """
+    return (os.getenv("ZOHO_DC") or "com").strip().lstrip(".").lower() or "com"
+
+
+def accounts_url() -> str:
+    return f"https://accounts.zoho.{dc()}"
+
+
+def api_url() -> str:
+    return f"https://mail.zoho.{dc()}/api"
 
 SCOPES = ("ZohoMail.accounts.READ,ZohoMail.messages.ALL,"
           "ZohoMail.folders.READ")
@@ -80,6 +98,29 @@ def _req(url: str, method: str = "GET", body: dict | None = None,
 # ======================
 # المصادقة
 # ======================
+def set_env(**pairs: str) -> str:
+    """
+    يكتب مفاتيح في .env ويحدّث البيئة الجارية.
+
+    يستبدل السطر إن وُجد بدل الإضافة: مفتاحان بالاسم نفسه في .env
+    يجعلان السلوك رهناً بترتيب القراءة - وهذا نوع الأعطال التي تظهر
+    بعد أسبوع بلا سبب ظاهر. ونحدّث os.environ كي تعمل الخطوة التالية
+    من المعالج بلا إعادة تشغيل.
+    """
+    p = _env_path()
+    txt = p.read_text(encoding="utf-8") if p.exists() else ""
+    for k, v in pairs.items():
+        v = (v or "").strip()
+        pat = re.compile(rf"^{re.escape(k)}=[^\r\n]*", re.M)
+        if pat.search(txt):
+            txt = pat.sub(lambda _m, _l=f"{k}={v}": _l, txt, count=1)
+        else:
+            txt = txt.rstrip("\n") + f"\n{k}={v}\n"
+        os.environ[k] = v
+    p.write_text(txt, encoding="utf-8")
+    return str(p)
+
+
 def exchange_code(code: str) -> dict:
     """يبدّل الرمز المؤقت برمز تحديث دائم ويكتبه في .env."""
     cid = os.getenv("ZOHO_CLIENT_ID")
@@ -87,7 +128,7 @@ def exchange_code(code: str) -> dict:
     if not cid or not sec:
         raise RuntimeError("ZOHO_CLIENT_ID و ZOHO_CLIENT_SECRET مطلوبان في .env")
 
-    out = _req(f"{ACCOUNTS}/oauth/v2/token", "POST", form={
+    out = _req(f"{accounts_url()}/oauth/v2/token", "POST", form={
         "grant_type": "authorization_code", "client_id": cid,
         "client_secret": sec, "code": code.strip()})
 
@@ -95,15 +136,8 @@ def exchange_code(code: str) -> dict:
     if not rt:
         raise RuntimeError(f"لا رمز تحديث في الرد: {out}")
 
-    p = _env_path()
-    txt = p.read_text(encoding="utf-8") if p.exists() else ""
-    if "ZOHO_REFRESH_TOKEN=" in txt:
-        import re
-        txt = re.sub(r"ZOHO_REFRESH_TOKEN=.*", f"ZOHO_REFRESH_TOKEN={rt}", txt)
-    else:
-        txt += f"\nZOHO_REFRESH_TOKEN={rt}\n"
-    p.write_text(txt, encoding="utf-8")
-    return {"saved_to": str(p), "scope": out.get("scope", "")}
+    return {"saved_to": set_env(ZOHO_REFRESH_TOKEN=rt),
+            "scope": out.get("scope", "")}
 
 
 def token() -> str:
@@ -123,7 +157,7 @@ def token() -> str:
         raise RuntimeError(
             "Zoho غير مُعدّ. الخطوات في رأس zoho.py — أو: python zoho.py setup")
 
-    out = _req(f"{ACCOUNTS}/oauth/v2/token", "POST", form={
+    out = _req(f"{accounts_url()}/oauth/v2/token", "POST", form={
         "grant_type": "refresh_token", "client_id": cid,
         "client_secret": sec, "refresh_token": rt})
     if not out.get("access_token"):
@@ -141,7 +175,7 @@ def account() -> dict:
     `accountId` يدخل في كل مسار، و`fromAddress` يجب أن يطابق الحساب
     المُصادَق عليه وإلا رفض Zoho الرسالة.
     """
-    out = _req(f"{API}/accounts", token=token())
+    out = _req(f"{api_url()}/accounts", token=token())
     data = out.get("data") or []
     if not data:
         raise RuntimeError("لا حساب بريد في هذا الاشتراك")
@@ -179,7 +213,7 @@ def save_draft(to: str, subject: str, body: str, acc: dict | None = None,
         payload["ccAddress"] = cc
     if in_reply_to:
         payload["inReplyTo"] = in_reply_to
-    return _req(f"{API}/accounts/{acc['accountId']}/messages", "POST",
+    return _req(f"{api_url()}/accounts/{acc['accountId']}/messages", "POST",
                 body=payload, token=token())
 
 
@@ -199,7 +233,7 @@ def send(to: str, subject: str, body: str, acc: dict | None = None,
     }
     if cc:
         payload["ccAddress"] = cc
-    return _req(f"{API}/accounts/{acc['accountId']}/messages", "POST",
+    return _req(f"{api_url()}/accounts/{acc['accountId']}/messages", "POST",
                 body=payload, token=token())
 
 
@@ -208,7 +242,7 @@ def send(to: str, subject: str, body: str, acc: dict | None = None,
 # ======================
 def folders(acc: dict | None = None) -> list[dict]:
     acc = acc or account()
-    out = _req(f"{API}/accounts/{acc['accountId']}/folders", token=token())
+    out = _req(f"{api_url()}/accounts/{acc['accountId']}/folders", token=token())
     return out.get("data") or []
 
 
@@ -219,7 +253,7 @@ def inbox(limit: int = 50, acc: dict | None = None) -> list[dict]:
                 if (f.get("folderName") or "").lower() == "inbox"), None)
     q = urllib.parse.urlencode({"limit": limit, "folderId": fid} if fid
                                else {"limit": limit})
-    out = _req(f"{API}/accounts/{acc['accountId']}/messages/view?{q}",
+    out = _req(f"{api_url()}/accounts/{acc['accountId']}/messages/view?{q}",
                token=token())
     return out.get("data") or []
 
@@ -321,12 +355,80 @@ def sync_replies(limit: int = 50, path: str | None = None) -> dict:
     return {"scanned": limit, "logged": logged, "matched": matched}
 
 
+def check() -> dict:
+    """يتحقّق من الربط فعلياً: رمز صالح وحساب يستجيب."""
+    missing = [k for k in ("ZOHO_CLIENT_ID", "ZOHO_CLIENT_SECRET",
+                           "ZOHO_REFRESH_TOKEN") if not os.getenv(k)]
+    if missing:
+        return {"ok": False, "reason": "ناقص في .env: " + "، ".join(missing)}
+    try:
+        acc = account()
+    except Exception as e:
+        return {"ok": False, "reason": f"{type(e).__name__}: {e}"}
+    return {"ok": True, "address": acc["address"],
+            "name": acc.get("name", ""), "dc": dc()}
+
+
+def setup(ask=input) -> dict:
+    """
+    معالج الربط: يسأل، يكتب .env، يبدّل الرمز، ثم يتحقّق فعلياً.
+
+    التحقّق في الآخر ليس زينة: تبديل الرمز ينجح ثم يفشل أول نداء حين
+    يكون مركز البيانات خاطئاً أو النطاق ناقصاً. أن يقول المعالج «تمّ»
+    ثم تفشل أول دفعة رسائل أسوأ من أن يفشل هنا صراحةً.
+    """
+    print("\n  ربط بريد Zoho — أربع خطوات، مرة واحدة\n" + "  " + "─" * 44)
+
+    cur_dc = dc()
+    print(f"\n[1/4] مركز بيانات حسابك: {' · '.join(DCS)}")
+    ans = (ask(f"      اتركه فارغاً للإبقاء على «{cur_dc}»: ") or "").strip()
+    ans = ans.lstrip(".").lower()
+    if ans and ans not in DCS:
+        return {"ok": False, "reason": f"مركز غير معروف: {ans}"}
+    if ans:
+        set_env(ZOHO_DC=ans)
+
+    print("\n[2/4] افتح: https://api-console.zoho." + dc())
+    print("      Add Client ← Self Client ← Create")
+    cid = (ask("      الصق Client ID: ") or "").strip()
+    sec = (ask("      الصق Client Secret: ") or "").strip()
+    if not (cid and sec):
+        return {"ok": False, "reason": "Client ID أو Secret فارغ"}
+    set_env(ZOHO_CLIENT_ID=cid, ZOHO_CLIENT_SECRET=sec)
+
+    print("\n[3/4] في التطبيق نفسه: تبويب Generate Code")
+    print("      Scope:\n        " + SCOPES)
+    print("      Time Duration: 10 minutes  ←  Create ← انسخ الرمز")
+
+    for attempt in (1, 2, 3):
+        code = (ask("\n[4/4] الصق الرمز: ") or "").strip().strip('"').strip("'")
+        if not code:
+            return {"ok": False, "reason": "لم يُدخَل رمز"}
+        try:
+            exchange_code(code)
+            break
+        except Exception as e:
+            print(f"      تعذّر: {e}")
+            if attempt == 3:
+                return {"ok": False, "reason": "فشل تبديل الرمز ثلاث مرات"}
+            print("      الرمز يُستهلك مرة واحدة وينتهي بعد 10 دقائق —"
+                  " ولّد رمزاً جديداً.")
+
+    got = check()
+    if got.get("ok"):
+        print(f"\n  ✓ مربوط: {got['address']}")
+        print(f"    المسودات سترفع إلى هذا الصندوق: python zoho.py push\n")
+    else:
+        print(f"\n  ✗ الرمز حُفظ لكن النداء فشل: {got.get('reason')}\n")
+    return got
+
+
 def setup_hint() -> str:
     cid = "✓" if os.getenv("ZOHO_CLIENT_ID") else "✗"
     sec = "✓" if os.getenv("ZOHO_CLIENT_SECRET") else "✗"
     ref = "✓" if os.getenv("ZOHO_REFRESH_TOKEN") else "✗"
     return "\n".join([
-        f"مركز البيانات : zoho.{DC}   (بدّله بـ ZOHO_DC إن كان حسابك غير ذلك)",
+        f"مركز البيانات : zoho.{dc()}   (بدّله بـ ZOHO_DC إن كان حسابك غير ذلك)",
         f"CLIENT_ID     : {cid}",
         f"CLIENT_SECRET : {sec}",
         f"REFRESH_TOKEN : {ref}",
@@ -337,6 +439,8 @@ def setup_hint() -> str:
         f"  3) تبويب Generate Code · النطاق:\n     {SCOPES}",
         "     المدة 10 دقائق ← انسخ الرمز",
         "  4) python zoho.py auth <الرمز>",
+        "",
+        "أو دعِ المعالج يقودك: python zoho.py setup",
     ])
 
 
@@ -356,7 +460,11 @@ if __name__ == "__main__":
 
     a = sys.argv[1:]
     try:
-        if a and a[0] == "auth" and len(a) > 1:
+        if a and a[0] == "setup":
+            sys.exit(0 if setup().get("ok") else 1)
+        elif a and a[0] == "check":
+            print(json.dumps(check(), ensure_ascii=False, indent=1))
+        elif a and a[0] == "auth" and len(a) > 1:
             print(json.dumps(exchange_code(a[1]), ensure_ascii=False, indent=1))
         elif a and a[0] == "account":
             print(json.dumps(account(), ensure_ascii=False, indent=1))

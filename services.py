@@ -269,17 +269,102 @@ def _outreach_batch(a: dict) -> str:
     return "\n".join(out)
 
 
+def _zoho_status(zoho) -> str:
+    """حالة الربط: ما المُدخَل، وما الخطوة التالية."""
+    import os
+
+    got = zoho.check()
+    if got.get("ok"):
+        return "\n".join([
+            f"مربوط ✓   {got['address']}   (zoho.{got['dc']})",
+            "",
+            "  push   يرفع المسودات إلى صندوقك",
+            "  sync   يقرأ الردود ويسجّلها في إدارة العلاقات",
+        ])
+
+    have = {k: bool(os.getenv(k)) for k in
+            ("ZOHO_CLIENT_ID", "ZOHO_CLIENT_SECRET", "ZOHO_REFRESH_TOKEN")}
+    mark = {True: "✓", False: "—"}
+    lines = [
+        f"غير مربوط   ({got.get('reason','')})",
+        "",
+        f"  مركز البيانات   zoho.{zoho.dc()}    بدّله: dc sa",
+        f"  Client ID       {mark[have['ZOHO_CLIENT_ID']]}",
+        f"  Client Secret   {mark[have['ZOHO_CLIENT_SECRET']]}",
+        f"  رمز التحديث     {mark[have['ZOHO_REFRESH_TOKEN']]}",
+        "",
+        "الربط من هنا — أربع خطوات:",
+        "",
+        f"  ١. افتح api-console.zoho.{zoho.dc()} ← Add Client ← Self Client",
+        "  ٢. اكتب هنا:  id <الصق Client ID>",
+        "     ثم:       secret <الصق Client Secret>",
+        "  ٣. في Zoho: تبويب Generate Code · المدة 10 دقائق · النطاق:",
+        f"     {zoho.SCOPES}",
+        "  ٤. اكتب هنا:  auth <الصق الرمز>",
+        "",
+        "الرمز يُستهلك مرة واحدة وينتهي بعد عشر دقائق.",
+    ]
+    return "\n".join(lines)
+
+
 def _zoho(a: dict) -> str:
+    """
+    وحدة تحكّم الربط.
+
+    المعالج في zoho.py تفاعلي عبر input()، وصاحب البرنامج يستعمله من
+    المتصفح لا من الطرفية - فالخطوات نفسها هنا أوامرَ سطرٍ واحد، وإلا
+    بقي الربط ممكناً نظرياً ومتعذّراً عملياً.
+    """
+    import json as _j
+
     import zoho
-    cmd = (a.get("input") or "").strip().lower()
-    if cmd == "push":
-        import json as _j
-        return _j.dumps(zoho.push_drafts(), ensure_ascii=False, indent=1)
-    if cmd == "sync":
-        import json as _j
-        return _j.dumps(zoho.sync_replies(), ensure_ascii=False, indent=1)
-    return (zoho.setup_hint()
-            + "\n\nاكتب push لرفع المسودات أو sync لقراءة الردود.")
+
+    raw = (a.get("input") or "").strip()
+    head, _, arg = raw.partition(" ")
+    head, arg = head.lower(), arg.strip().strip('"').strip("'")
+
+    if not raw or head in ("status", "حالة"):
+        return _zoho_status(zoho)
+
+    try:
+        if head == "check":
+            return _zoho_status(zoho)
+
+        if head == "dc":
+            if arg.lower().lstrip(".") not in zoho.DCS:
+                return "مركز غير معروف. المتاح: " + " · ".join(zoho.DCS)
+            zoho.set_env(ZOHO_DC=arg.lower().lstrip("."))
+            return f"مركز البيانات: zoho.{zoho.dc()}"
+
+        if head in ("id", "client_id"):
+            if not arg:
+                return "اكتب: id <الصق Client ID>"
+            zoho.set_env(ZOHO_CLIENT_ID=arg)
+            return "حُفظ Client ID ✓   التالي: secret <الصق Client Secret>"
+
+        if head in ("secret", "client_secret"):
+            if not arg:
+                return "اكتب: secret <الصق Client Secret>"
+            zoho.set_env(ZOHO_CLIENT_SECRET=arg)
+            return ("حُفظ Client Secret ✓   التالي: ولّد الرمز في Zoho"
+                    " ثم اكتب: auth <الرمز>")
+
+        if head == "auth":
+            if not arg:
+                return "اكتب: auth <الصق الرمز>"
+            zoho.exchange_code(arg)
+            return _zoho_status(zoho)
+
+        if head == "push":
+            return _j.dumps(zoho.push_drafts(), ensure_ascii=False, indent=1)
+
+        if head == "sync":
+            return _j.dumps(zoho.sync_replies(), ensure_ascii=False, indent=1)
+
+    except Exception as e:
+        return f"تعذّر: {e}"
+
+    return _zoho_status(zoho)
 
 
 def _hunt_deadlines(a: dict) -> str:
@@ -412,9 +497,10 @@ REGISTRY: list[Service] = [
     Service("deadlines", "صيد مواعيد الإغلاق",
             "يملأ المواعيد الناقصة لأعلى الفرص", "slow", _hunt_deadlines,
             placeholder="8"),
-    Service("zoho", "Zoho Mail",
-            "رفع المسودات وقراءة الردود · push أو sync",
-            "slow", _zoho, placeholder="push   ·   sync"),
+    Service("zoho", "بريد Zoho",
+            "ربط البريد، ورفع المسودات، وقراءة الردود",
+            "slow", _zoho,
+            placeholder="اتركه فارغاً للحالة · id · secret · auth · push · sync"),
 ]
 
 BY_ID = {s.id: s for s in REGISTRY}
